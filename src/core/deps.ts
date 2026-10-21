@@ -1,0 +1,23 @@
+// What core functions need from the outside world. Callers (routes, MCP tools, scripts)
+// build this once and pass it in, so core never imports a provider SDK or a global client.
+import type { Merchant, PrismaClient } from "@/generated/prisma/client";
+import type { ProviderAdapter } from "@/core/types";
+
+/** The merchant fields an adapter factory needs: the encrypted key and the environment flags. */
+export type MerchantProviderConfig = Pick<
+  Merchant,
+  "dodoApiKeyEncrypted" | "dodoEnvironment" | "liveModeEnabled"
+>;
+
+export type AdapterFor = (merchant: MerchantProviderConfig) => ProviderAdapter;
+
+export interface CoreDeps {
+  db: PrismaClient;
+  adapterFor: AdapterFor;
+  /** Injectable clock for tests. Defaults to the real time. */
+  now?: () => Date;
+}
+
+export function nowFrom(deps: Pick<CoreDeps, "now">): Date {
+  return deps.now ? deps.now() : new Date();
+}

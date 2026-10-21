@@ -38,6 +38,14 @@ export class ProviderError extends OpenMorError {
   }
 }
 
+/** Bad caller input (e.g. a malformed slug). Not an agent-facing error code: protocol layers validate first. */
+export class InvalidInputError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "InvalidInputError";
+  }
+}
+
 /** Thrown by adapter methods that exist in the interface but are not built yet. */
 export class NotImplementedError extends Error {
   constructor(what: string) {
