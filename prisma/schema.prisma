@@ -71,10 +71,11 @@ model Merchant {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  products   Product[]
-  quotes     Quote[]
-  orders     Order[]
-  buyerLinks BuyerLink[]
+  products      Product[]
+  quotes        Quote[]
+  orders        Order[]
+  buyerLinks    BuyerLink[]
+  webhookEvents WebhookEvent[]
 }
 
 // Cache of the merchant's provider catalog, refreshed by sync. The provider is
@@ -171,26 +172,34 @@ model Order {
   status       OrderStatus  @default(pending_payment)
   checkoutMode CheckoutMode
 
-  // Amounts actually charged, copied from the quote that passed re-preview.
+  // Amounts from the quote the buyer accepted.
   currency    String @db.Char(3)
   taxAmount   Int
   totalAmount Int
+
+  // What the provider actually charged (from the payment webhook). Handoff checkout accepts
+  // FX drift, so these can differ slightly from the quoted amounts above.
+  chargedCurrency    String? @db.Char(3)
+  chargedTaxAmount   Int?
+  chargedTotalAmount Int?
 
   providerCheckoutSessionId String? @unique @db.VarChar(128)
   providerPaymentId         String? @unique @db.VarChar(128)
   checkoutUrl               String? @db.VarChar(2048)
 
-  // What the buyer received: license keys, entitlements, downloads, etc.
+  // Non-secret references to what the buyer received (provider customer/subscription ids,
+  // delivery types). Never license keys or download URLs: those are fetched live at read time.
   fulfillment Json?
 
   paidAt    DateTime?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
-  merchant     Merchant      @relation(fields: [merchantId], references: [id], onDelete: Restrict)
-  quote        Quote         @relation(fields: [quoteId], references: [id], onDelete: Restrict)
-  buyerLink    BuyerLink?    @relation(fields: [buyerLinkId], references: [id], onDelete: SetNull)
-  agentSession AgentSession? @relation(fields: [agentSessionId], references: [id], onDelete: SetNull)
+  merchant      Merchant       @relation(fields: [merchantId], references: [id], onDelete: Restrict)
+  quote         Quote          @relation(fields: [quoteId], references: [id], onDelete: Restrict)
+  webhookEvents WebhookEvent[]
+  buyerLink     BuyerLink?     @relation(fields: [buyerLinkId], references: [id], onDelete: SetNull)
+  agentSession  AgentSession?  @relation(fields: [agentSessionId], references: [id], onDelete: SetNull)
 
   @@index([merchantId, createdAt])
   @@index([buyerEmail])
@@ -237,9 +246,9 @@ model BuyerLink {
 
 // An AI agent client talking to OpenMoR (e.g. one MCP connection).
 model AgentSession {
-  id        String  @id @default(cuid())
+  id         String  @id @default(cuid())
   // SHA-256 of the session bearer token.
-  tokenHash String  @unique @db.Char(64)
+  tokenHash  String  @unique @db.Char(64)
   // Self-reported client name, e.g. "claude-code". Data, not trusted.
   clientName String? @db.VarChar(200)
 
@@ -250,4 +259,26 @@ model AgentSession {
   quotes     Quote[]
   orders     Order[]
   buyerLinks BuyerLink[]
+}
+
+// One row per provider webhook delivery, so retries are processed once. Keyed by the
+// Standard Webhooks `webhook-id` header, which stays the same across retries.
+// Stores no payload: payment bodies carry buyer personal data we do not need to keep.
+model WebhookEvent {
+  id         String  @id @default(cuid())
+  merchantId String
+  webhookId  String  @db.VarChar(128)
+  type       String  @db.VarChar(64)
+  // The order this event was matched to, if any (other sales of the merchant are ignored).
+  orderId    String?
+
+  receivedAt  DateTime  @default(now())
+  // Null until processing finished: a retry of an unfinished event is processed again.
+  processedAt DateTime?
+
+  merchant Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  order    Order?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@unique([merchantId, webhookId])
+  @@index([orderId])
 }
