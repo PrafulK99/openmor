@@ -66,6 +66,7 @@ src/
 ## Conventions
 
 - Conventional Commits (`feat:`, `fix:`, `docs:`, `test:`, `chore:`). Small commits, one concern each.
+- Git workflow: never commit to `main`. Do each piece of work on a feature branch (`feat/...`, `fix/...`, `chore/...`) branched from an up-to-date `main`, commit there, and push the branch. Do NOT open, edit or merge pull requests: the maintainer opens, reviews and merges them on GitHub.
 - Every core function gets a Vitest unit test. Adapter code gets tests with a mocked SDK.
 - Money is integer minor units (cents/paise) everywhere; never floats.
 - Dev machine is Windows: scripts must work in PowerShell (use `cross-env`, avoid bash-only syntax in package.json scripts).
