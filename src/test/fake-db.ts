@@ -1,13 +1,14 @@
 // In-memory stand-in for the Prisma client, covering only the queries core uses.
 // It interprets where clauses, so tests check real filtering, not just call arguments.
 // Supported: equality, contains (+ mode insensitive), lt/lte/gt/gte, in/notIn, AND/OR/NOT,
-// to-one relation filters with `is`, select/include of relations, orderBy, take.
+// to-one relation filters with `is`, select/include of relations, orderBy, take,
+// and $transaction(fn) with rollback on error.
 import type { PrismaClient } from "@/generated/prisma/client";
 
 type Row = Record<string, unknown>;
 type Where = Record<string, unknown>;
 
-type ModelName = "merchant" | "product" | "quote" | "agentSession";
+type ModelName = "merchant" | "product" | "quote" | "agentSession" | "order" | "webhookEvent";
 
 // To-one relations: field name -> [model, foreign key].
 const RELATIONS: Record<ModelName, Record<string, [ModelName, string]>> = {
@@ -15,6 +16,8 @@ const RELATIONS: Record<ModelName, Record<string, [ModelName, string]>> = {
   product: { merchant: ["merchant", "merchantId"] },
   quote: { merchant: ["merchant", "merchantId"], product: ["product", "productId"] },
   agentSession: {},
+  order: { merchant: ["merchant", "merchantId"], quote: ["quote", "quoteId"] },
+  webhookEvent: { merchant: ["merchant", "merchantId"], order: ["order", "orderId"] },
 };
 
 const DEFAULTS: Record<ModelName, Row> = {
@@ -27,6 +30,20 @@ const DEFAULTS: Record<ModelName, Row> = {
   product: { description: null, imageUrl: null, isRecurring: false, agentSellable: false, active: true, providerData: null },
   quote: { agentSessionId: null, quantity: 1, state: null, zip: null, discountCodes: [], discountAmount: 0, recurringBreakup: null, taxRateBps: null, isConverted: false, isBinding: true, status: "open" },
   agentSession: { clientName: null, expiresAt: null },
+  order: {
+    buyerLinkId: null,
+    agentSessionId: null,
+    status: "pending_payment",
+    chargedCurrency: null,
+    chargedTaxAmount: null,
+    chargedTotalAmount: null,
+    providerCheckoutSessionId: null,
+    providerPaymentId: null,
+    checkoutUrl: null,
+    fulfillment: null,
+    paidAt: null,
+  },
+  webhookEvent: { orderId: null, processedAt: null },
 };
 
 const UNIQUE: Record<ModelName, string[][]> = {
@@ -34,6 +51,8 @@ const UNIQUE: Record<ModelName, string[][]> = {
   product: [["merchantId", "providerProductId"]],
   quote: [],
   agentSession: [["tokenHash"]],
+  order: [["idempotencyKey"], ["providerCheckoutSessionId"], ["providerPaymentId"]],
+  webhookEvent: [["merchantId", "webhookId"]],
 };
 
 function uniqueViolation(): Error {
@@ -41,7 +60,7 @@ function uniqueViolation(): Error {
 }
 
 export class FakeDb {
-  readonly tables: Record<ModelName, Row[]> = { merchant: [], product: [], quote: [], agentSession: [] };
+  readonly tables: Record<ModelName, Row[]> = { merchant: [], product: [], quote: [], agentSession: [], order: [], webhookEvent: [] };
   #seq = 0;
   #clock: () => Date;
 
@@ -53,6 +72,21 @@ export class FakeDb {
   readonly product = this.#model("product");
   readonly quote = this.#model("quote");
   readonly agentSession = this.#model("agentSession");
+  readonly order = this.#model("order");
+  readonly webhookEvent = this.#model("webhookEvent");
+
+  /** Interactive transaction: runs fn against this fake and restores every table if it throws. */
+  async $transaction<T>(fn: (tx: this) => Promise<T>): Promise<T> {
+    const snapshot = structuredClone(this.tables);
+    try {
+      return await fn(this);
+    } catch (err) {
+      for (const name of Object.keys(snapshot) as ModelName[]) {
+        this.tables[name].splice(0, this.tables[name].length, ...snapshot[name]);
+      }
+      throw err;
+    }
+  }
 
   asPrisma(): PrismaClient {
     return this as unknown as PrismaClient;
@@ -67,6 +101,11 @@ export class FakeDb {
       findUnique: async (args: { where: Where; select?: Row; include?: Row }) => {
         const row = this.#rows(name, this.#expandUnique(args.where))[0];
         return row ? this.#shape(name, row, args) : null;
+      },
+      findUniqueOrThrow: async (args: { where: Where; select?: Row; include?: Row }) => {
+        const row = this.#rows(name, this.#expandUnique(args.where))[0];
+        if (!row) throw Object.assign(new Error("Record not found"), { code: "P2025" });
+        return this.#shape(name, row, args);
       },
       findFirst: async (args: { where?: Where; select?: Row; include?: Row }) => {
         const row = this.#rows(name, args.where)[0];
@@ -115,6 +154,8 @@ export class FakeDb {
       ...stripUndefined(data),
     };
     for (const keys of UNIQUE[name]) {
+      // Like Postgres, NULLs never collide in a unique index.
+      if (keys.some((k) => row[k] === null || row[k] === undefined)) continue;
       if (this.tables[name].some((r) => keys.every((k) => r[k] === row[k]))) throw uniqueViolation();
     }
     this.tables[name].push(row);
