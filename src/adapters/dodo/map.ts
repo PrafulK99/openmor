@@ -6,8 +6,9 @@ import type {
   ProductListResponse,
 } from "dodopayments/resources/products/products";
 import type { TimeInterval } from "dodopayments/resources/subscriptions";
+import type { Payment as DodoPayment } from "dodopayments/resources/payments";
 import { limitText, TEXT_LIMITS } from "@/core/text";
-import type { BillingPeriod, Product, ProviderQuote, QuoteBreakup } from "@/core/types";
+import type { BillingPeriod, Payment, Product, ProviderQuote, QuoteBreakup, WebhookEvent } from "@/core/types";
 
 const INTERVALS: Record<TimeInterval, BillingPeriod["interval"]> = {
   Day: "day",
@@ -126,4 +127,48 @@ export function mapQuote(r: CheckoutSessionPreviewResponse): ProviderQuote {
     // With BYOP the merchant's own processor handles tax, so Dodo's numbers exclude it.
     isBinding: !r.is_byop,
   };
+}
+
+const PAYMENT_STATUS: Partial<Record<NonNullable<DodoPayment["status"]>, Payment["status"]>> = {
+  succeeded: "succeeded",
+  failed: "failed",
+  cancelled: "cancelled",
+};
+
+/** Map a Dodo payment. `statusOverride` comes from the webhook event type, which is authoritative. */
+export function mapPayment(p: DodoPayment, statusOverride?: Payment["status"]): Payment {
+  return {
+    paymentId: p.payment_id,
+    status: statusOverride ?? (p.status ? (PAYMENT_STATUS[p.status] ?? "processing") : "processing"),
+    currency: p.currency,
+    total: p.total_amount,
+    tax: p.tax ?? 0,
+    checkoutSessionId: p.checkout_session_id ?? null,
+    customerId: p.customer?.customer_id ?? null,
+    subscriptionId: p.subscription_id ?? null,
+    metadata: Object.fromEntries(Object.entries(p.metadata ?? {}).map(([k, v]) => [k, String(v)])),
+  };
+}
+
+const PAYMENT_EVENTS: Record<string, Payment["status"]> = {
+  "payment.succeeded": "succeeded",
+  "payment.failed": "failed",
+  "payment.cancelled": "cancelled",
+  "payment.processing": "processing",
+};
+
+/** Normalize a verified webhook body. Only payment events carry a payment. */
+export function mapWebhookEvent(webhookId: string, body: unknown): WebhookEvent {
+  const event = (typeof body === "object" && body !== null ? body : {}) as {
+    type?: unknown;
+    timestamp?: unknown;
+    data?: unknown;
+  };
+  const type = typeof event.type === "string" ? event.type.slice(0, 64) : "unknown";
+  const occurredAt = typeof event.timestamp === "string" ? event.timestamp : new Date().toISOString();
+  const status = PAYMENT_EVENTS[type];
+  if (status && typeof event.data === "object" && event.data !== null && "payment_id" in event.data) {
+    return { id: webhookId, type, occurredAt, payment: mapPayment(event.data as DodoPayment, status) };
+  }
+  return { id: webhookId, type, occurredAt };
 }

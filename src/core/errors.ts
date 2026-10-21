@@ -49,6 +49,14 @@ export class InvalidInputError extends OpenMorError {
   }
 }
 
+/** A webhook failed signature verification or could not be read. Answer HTTP 401; never log its body. */
+export class WebhookVerificationError extends Error {
+  constructor(reason: string) {
+    super(`Webhook rejected: ${reason}`);
+    this.name = "WebhookVerificationError";
+  }
+}
+
 /** Thrown by adapter methods that exist in the interface but are not built yet. */
 export class NotImplementedError extends Error {
   constructor(what: string) {

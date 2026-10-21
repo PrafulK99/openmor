@@ -92,21 +92,39 @@ export interface SavedMethodChargeInput extends CheckoutInput {
   paymentMethodId: string;
 }
 
-export type PaymentStatus = "pending" | "succeeded" | "failed" | "cancelled";
+export type PaymentStatus = "processing" | "succeeded" | "failed" | "cancelled";
 
 export interface Payment {
   paymentId: string;
   status: PaymentStatus;
   currency: string;
+  /** Amount charged including tax, in minor units. */
   total: number;
   tax: number;
+  checkoutSessionId: string | null;
+  customerId: string | null;
+  subscriptionId: string | null;
+  /** Metadata we attached at checkout (e.g. openmor_order_id), as strings. */
+  metadata: Record<string, string>;
 }
 
+export interface DeliveredLicenseKey {
+  id: string;
+  /** SECRET. Fetched live for the buyer's agent; never stored or logged by OpenMoR. */
+  key: string;
+  status: string;
+  activationsLimit: number | null;
+  expiresAt: string | null;
+}
+
+/** What a paid order delivered, read live from the provider. Contains secrets: never persist it. */
 export interface Fulfillment {
   paymentId: string;
-  licenseKeys: string[];
-  downloads: { filename: string; url: string; expiresAt: string | null }[];
-  entitlements: { type: string; name: string }[];
+  licenseKeys: DeliveredLicenseKey[];
+  subscription: { id: string; status: string; nextBillingDate: string | null } | null;
+  credits: { name: string; balance: string; unit: string }[];
+  /** Short-lived link where the buyer manages purchases and subscriptions. Treat as a secret. */
+  portalUrl: string | null;
 }
 
 /** Who the buyer is actually paying, shown on quotes so agents can tell the buyer. */
@@ -120,10 +138,14 @@ export interface WebhookInput {
   rawBody: string;
 }
 
+/** A verified provider webhook, normalized. Unknown event kinds come through as type only. */
 export interface WebhookEvent {
+  /** Delivery id, stable across retries (Standard Webhooks `webhook-id`). */
   id: string;
   type: string;
-  data: unknown;
+  occurredAt: string;
+  /** Set for payment events. */
+  payment?: Payment;
 }
 
 export interface ProviderAdapter {
