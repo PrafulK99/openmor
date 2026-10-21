@@ -26,12 +26,14 @@ const PROVIDER = "Dodo Payments";
 export class DodoAdapter implements ProviderAdapter {
   readonly #client: DodoPayments;
   readonly #apiKey: string;
+  readonly environment: ProviderEnvironment;
 
   constructor({ apiKey, environment }: DodoAdapterOptions) {
     if (!apiKey) throw new Error("DodoAdapter needs an API key");
     this.#apiKey = apiKey;
+    this.environment = environment;
     // Pass every option explicitly: left out, the SDK falls back to DODO_PAYMENTS_* env vars
-    // and to live_mode. The caller decides the key and environment, never the environment.
+    // and to live_mode. The caller decides the key and mode, never process.env.
     this.#client = new DodoPayments({
       bearerToken: apiKey,
       environment,
