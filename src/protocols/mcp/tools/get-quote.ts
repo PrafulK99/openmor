@@ -18,7 +18,7 @@ const inputSchema = z.object({
 });
 
 const outputSchema = z.object({
-  quote_id: z.string().describe("Pass this to checkout. Valid until expires_at."),
+  quote_id: z.string().describe("Pass this to checkout while expires_in_seconds is above zero."),
   merchant_id: z.string(),
   product_id: z.string(),
   product_name: z.string(),
@@ -35,7 +35,13 @@ const outputSchema = z.object({
   is_converted: z.boolean().describe("True if converted from the list currency: the amount may move slightly at checkout."),
   list_currency: z.string().describe("Currency of the merchant's list price."),
   is_binding: z.boolean().describe("False means tax is not included and the total is only an estimate."),
-  expires_at: z.string().describe("ISO 8601 time after which this quote can no longer be used."),
+  expires_at: z.iso
+    .datetime()
+    .describe('When the quote stops being usable, ISO 8601 in UTC with a trailing Z, e.g. "2026-10-21T19:37:00.000Z".'),
+  expires_in_seconds: z
+    .number()
+    .int()
+    .describe("Seconds until the quote expires, counted when this response was made. Use this to judge validity."),
   renewal: z
     .object({
       total: moneySchema,
@@ -52,6 +58,7 @@ export const getQuoteTool = defineTool({
   description: [
     "Get the price a buyer will pay for a product, with tax for their country, and a quote_id that checkout needs.",
     "Call it after search_products (and optionally get_product), once you know the buyer's country. The quote is valid for 15 minutes; get a new one if it expires.",
+    "Judge whether a quote is still valid from expires_in_seconds (seconds left when it was returned), not by comparing the expires_at date with your own idea of today's date: expires_at is in UTC, which can be a different calendar day from the buyer's.",
     "Always tell the buyer the quote's total in the quote's currency (e.g. EUR for Germany), not the list price from search.",
     "Never invent, convert or round prices yourself: use the formatted amounts returned here.",
     "If is_binding is false the merchant handles tax itself and the total excludes tax: present it as an estimate.",
@@ -110,8 +117,11 @@ export const getQuoteTool = defineTool({
       summary += ` Converted from ${product.currency}, so the final amount may move slightly at checkout.`;
     }
     if (renewal) summary += ` Renews at ${renewal.total.formatted} ${every ?? "each billing period"}.`;
-    const minutes = Math.max(0, Math.round((q.expiresAt.getTime() - nowFrom(deps).getTime()) / 60_000));
-    summary += ` Quote valid for ${minutes} minutes.`;
+    const expiresInSeconds = Math.max(0, Math.floor((q.expiresAt.getTime() - nowFrom(deps).getTime()) / 1000));
+    const minutes = Math.round(expiresInSeconds / 60);
+    const untilUtc = q.expiresAt.toISOString().slice(11, 16);
+    const validFor = minutes >= 1 ? `${minutes} minute${minutes === 1 ? "" : "s"}` : "less than a minute";
+    summary += ` Quote valid for ${validFor} (until ${untilUtc} UTC).`;
 
     return ok(
       {
@@ -133,6 +143,7 @@ export const getQuoteTool = defineTool({
         list_currency: product.currency,
         is_binding: q.isBinding,
         expires_at: q.expiresAt.toISOString(),
+        expires_in_seconds: expiresInSeconds,
         renewal,
       },
       summary,

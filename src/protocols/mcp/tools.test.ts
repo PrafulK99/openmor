@@ -151,14 +151,40 @@ describe("get_quote", () => {
       is_converted: true,
       list_currency: "USD",
       is_binding: true,
-      expires_at: new Date(t.clock.now().getTime() + QUOTE_TTL_MS).toISOString(),
+      expires_at: "2026-10-21T12:15:00.000Z",
+      expires_in_seconds: QUOTE_TTL_MS / 1000,
       renewal: null,
     });
     expect(text(r)).toBe(
-      "ShareThings Lifetime: €9.54 including 19% VAT for Germany. Converted from USD, so the final amount may move slightly at checkout. Quote valid for 15 minutes.",
+      "ShareThings Lifetime: €9.54 including 19% VAT for Germany. Converted from USD, so the final amount may move slightly at checkout. Quote valid for 15 minutes (until 12:15 UTC).",
     );
     expect(t.db.tables.quote[0]!.agentSessionId).toBe("ags_1");
     expect(getQuoteTool.outputSchema.safeParse(data(r)).success).toBe(true);
+  });
+
+  it("computes expires_in_seconds at response time and keeps expires_at in UTC with a Z", async () => {
+    // Late evening in India is already the next day there, but expires_at stays a UTC instant.
+    const created = new Date("2026-10-21T19:22:00Z"); // 00:52 IST on 22 October
+    let calls = 0;
+    // First clock read stores the quote; the second builds the response 2 minutes later.
+    const now = () => (calls++ === 0 ? created : new Date(created.getTime() + 120_000));
+    const r = await call(
+      getQuoteTool.handler({ merchant_id: merchantId, product_id: lifetimeId, buyer_country: "IN" }, { deps: { ...t.deps, now } }),
+    );
+    expect(data(r).expires_at).toBe("2026-10-21T19:37:00.000Z");
+    expect(data(r).expires_at).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+    expect(data(r).expires_in_seconds).toBe(13 * 60);
+    expect(Number.isInteger(data(r).expires_in_seconds)).toBe(true);
+    expect(text(r)).toMatch(/Quote valid for 13 minutes \(until 19:37 UTC\)\.$/);
+  });
+
+  it("never reports negative time left", async () => {
+    let calls = 0;
+    const start = new Date("2026-10-21T12:00:00Z");
+    const now = () => (calls++ === 0 ? start : new Date(start.getTime() + QUOTE_TTL_MS + 5_000));
+    const r = await call(getQuoteTool.handler({ merchant_id: merchantId, product_id: lifetimeId, buyer_country: "DE" }, { deps: { ...t.deps, now } }));
+    expect(data(r).expires_in_seconds).toBe(0);
+    expect(text(r)).toMatch(/Quote valid for less than a minute \(until 12:15 UTC\)\.$/);
   });
 
   it("includes the renewal amount for subscriptions", async () => {
@@ -182,7 +208,7 @@ describe("get_quote", () => {
       getQuoteTool.handler({ merchant_id: merchantId, product_id: lifetimeId, quantity: 2, buyer_country: "US", buyer_state: "CA", buyer_zip: "94102" }, env),
     );
     expect(t.adapter.quote).toHaveBeenCalledWith({ items: [{ productId: "pdt_life", quantity: 2 }], country: "US", state: "CA", zip: "94102" });
-    expect(text(r)).toBe("2 × ShareThings Lifetime: $49.00, no sales tax for United States (CA). Quote valid for 15 minutes.");
+    expect(text(r)).toBe("2 × ShareThings Lifetime: $49.00, no sales tax for United States (CA). Quote valid for 15 minutes (until 12:15 UTC).");
     expect(data(r)).toMatchObject({ is_converted: false, buyer_state: "CA", buyer_zip: "94102", tax_rate_percent: 0 });
   });
 
