@@ -20,7 +20,8 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "try:quote": "tsx scripts/try-quote.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.1",
