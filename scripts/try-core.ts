@@ -6,6 +6,23 @@ import { formatMoney } from "../src/core/money";
 import { createQuote, getQuote } from "../src/core/quotes";
 import { searchProducts } from "../src/core/search";
 
+const IST = "Asia/Kolkata";
+
+/** "2026-10-22 00:12:00" in the given IANA time zone. */
+function formatTime(date: Date, timeZone: string): string {
+  // sv-SE gives an ISO-like "YYYY-MM-DD HH:mm:ss" layout.
+  return new Intl.DateTimeFormat("sv-SE", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  }).format(date);
+}
+
 void run(async () => {
   const results = await searchProducts(deps, { query: "sharethings" });
   console.log(`Search "sharethings": ${results.length} result(s)\n`);
@@ -44,6 +61,9 @@ void run(async () => {
   console.log(`  discount    ${m(stored.discount)}`);
   console.log(`  tax         ${m(stored.tax)}`);
   console.log(`  total       ${m(stored.total)}`);
+  console.log(`  tax rate    ${stored.taxRateBps === null ? "n/a" : `${(stored.taxRateBps / 100).toFixed(2)}%`}`);
+  console.log(`  converted   ${stored.isConverted ? `yes (list price in ${first.currency})` : "no"}`);
   if (stored.recurring) console.log(`  renews at   ${m(stored.recurring.total)}`);
-  console.log(`  expires at  ${stored.expiresAt.toISOString()} (in ${Math.round((stored.expiresAt.getTime() - Date.now()) / 60000)} min)`);
+  const minutesLeft = Math.round((stored.expiresAt.getTime() - Date.now()) / 60000);
+  console.log(`  expires at  ${formatTime(stored.expiresAt, IST)} IST (${formatTime(stored.expiresAt, "UTC")} UTC), in ${minutesLeft} min`);
 });

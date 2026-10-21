@@ -3,7 +3,7 @@ import "./_env";
 import { adapterFor } from "../src/adapters";
 import type { CatalogProduct } from "../src/core/catalog";
 import type { CoreDeps } from "../src/core/deps";
-import { InvalidInputError, OpenMorError } from "../src/core/errors";
+import { OpenMorError } from "../src/core/errors";
 import { formatMoney } from "../src/core/money";
 import { db } from "../src/lib/db";
 
@@ -15,7 +15,6 @@ export async function run(main: () => Promise<void>): Promise<void> {
     await main();
   } catch (err) {
     if (err instanceof OpenMorError) console.error(`Error ${err.code}: ${err.message}`);
-    else if (err instanceof InvalidInputError) console.error(`Invalid input: ${err.message}`);
     else console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
     process.exitCode = 1;
   } finally {

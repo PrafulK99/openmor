@@ -28,10 +28,13 @@ src/
 
 - Protocol layers call `core`. `core` calls a `ProviderAdapter`. Only adapters call a provider SDK.
 - Every provider implements `ProviderAdapter` (see `src/core/types.ts`): `listProducts`, `getProduct`, `quote`, `createCheckout`, `chargeSavedMethod`, `getPayment`, `getFulfillment`, `paymentIdentity`, `verifyWebhook`.
-- Agents never send amounts. They send a `quote_id`; checkout re-runs the preview and refuses with `PRICE_CHANGED` if the total moved.
+- Agents never send amounts. They send a `quote_id`; checkout re-runs the preview and refuses with `PRICE_CHANGED` if the total moved outside the FX drift policy below.
 - Every result from `search_products` carries `merchant_id`; `get_product` and `get_quote` require it.
-- Error codes are stable strings: `QUOTE_EXPIRED`, `PRICE_CHANGED`, `PRODUCT_UNAVAILABLE`, `LIMIT_EXCEEDED`, `BUYER_NOT_LINKED`, `PROVIDER_ERROR`, `MERCHANT_NOT_FOUND`.
+- Error codes are stable strings: `QUOTE_EXPIRED`, `PRICE_CHANGED`, `PRODUCT_UNAVAILABLE`, `LIMIT_EXCEEDED`, `BUYER_NOT_LINKED`, `PROVIDER_ERROR`, `MERCHANT_NOT_FOUND`, `INVALID_INPUT` (bad caller input, e.g. quantity 0 or a malformed country; raised as `InvalidInputError`). The list lives in `src/core/errors.ts`.
 - Every tool returns typed JSON plus a short human-readable `summary` string.
+- FX drift policy. Dodo converts list prices into the buyer's currency at live exchange rates, so the same quote can come out a little different minutes later. `Quote.isConverted` is true when the quote currency differs from the product's list currency.
+  - Handoff checkout accepts drift: the buyer sees and confirms the final amount on Dodo's hosted page.
+  - Saved-method checkout charges only if the re-preview total is at most 1% above the quoted total AND within the buyer link's caps (per order and total). Otherwise refuse with `PRICE_CHANGED` and return a fresh quote. A lower total is always fine.
 
 ## Security rules (payments project: never relax these)
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { NotImplementedError, OpenMorError, ProviderError } from "@/core/errors";
+import { InvalidInputError, NotImplementedError, OpenMorError, ProviderError } from "@/core/errors";
 
 describe("ProviderError", () => {
   it("is an OpenMorError with the PROVIDER_ERROR code", () => {
@@ -19,5 +19,13 @@ describe("ProviderError", () => {
 describe("NotImplementedError", () => {
   it("names the missing piece", () => {
     expect(new NotImplementedError("X.y").message).toBe("X.y is not implemented yet");
+  });
+});
+
+describe("InvalidInputError", () => {
+  it("carries the stable INVALID_INPUT code", () => {
+    const err = new InvalidInputError("quantity must be a whole number");
+    expect(err).toBeInstanceOf(OpenMorError);
+    expect(err.code).toBe("INVALID_INPUT");
   });
 });

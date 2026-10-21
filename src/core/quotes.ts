@@ -37,6 +37,10 @@ export interface QuoteView {
   tax: number;
   total: number;
   recurring: QuoteBreakup | null;
+  /** Tax rate of the product in basis points (1900 = 19%). Null if the provider gave none. */
+  taxRateBps: number | null;
+  /** Quote currency differs from the product's list currency, so the total can drift with FX rates. */
+  isConverted: boolean;
   isBinding: boolean;
   status: "open" | "used" | "expired";
   expiresAt: Date;
@@ -59,6 +63,8 @@ function toView(q: Quote): QuoteView {
     tax: q.taxAmount,
     total: q.totalAmount,
     recurring: (q.recurringBreakup as QuoteBreakup | null) ?? null,
+    taxRateBps: q.taxRateBps,
+    isConverted: q.isConverted,
     isBinding: q.isBinding,
     status: q.status,
     expiresAt: q.expiresAt,
@@ -112,6 +118,10 @@ export async function createQuote(deps: CoreDeps, input: CreateQuoteInput): Prom
     ...(discountCodes.length ? { discountCodes } : {}),
   });
 
+  const line =
+    preview.items.find((i) => i.productId === product.providerProductId) ?? preview.items[0];
+  const isConverted = preview.currency.toUpperCase() !== product.currency.toUpperCase();
+
   const now = nowFrom(deps);
   const quote = await deps.db.quote.create({
     data: {
@@ -128,6 +138,8 @@ export async function createQuote(deps: CoreDeps, input: CreateQuoteInput): Prom
       taxAmount: preview.tax,
       totalAmount: preview.total,
       recurringBreakup: preview.recurring ? { ...preview.recurring } : undefined,
+      taxRateBps: line?.taxRateBps ?? null,
+      isConverted,
       isBinding: preview.isBinding,
       status: "open",
       expiresAt: new Date(now.getTime() + QUOTE_TTL_MS),

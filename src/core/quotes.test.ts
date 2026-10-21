@@ -39,6 +39,9 @@ describe("createQuote", () => {
       isBinding: true,
       status: "open",
       recurring: null,
+      taxRateBps: 1900,
+      // Seeded product is listed in USD, the fake preview is in EUR.
+      isConverted: true,
     });
     expect(q.expiresAt.getTime() - t.clock.now().getTime()).toBe(QUOTE_TTL_MS);
     expect(t.db.tables.quote).toHaveLength(1);
@@ -52,6 +55,18 @@ describe("createQuote", () => {
     const q = await createQuote(t.deps, { merchantId, productId, quantity: 1, buyer });
     expect(q.isBinding).toBe(false);
     expect(q.recurring).toEqual({ subtotal: 445, discount: 0, tax: 85, total: 530 });
+  });
+
+  it("marks a same-currency quote as not converted", async () => {
+    t.adapter.quote.mockResolvedValueOnce(providerQuote({ currency: "USD" }));
+    const q = await createQuote(t.deps, { merchantId, productId, quantity: 1, buyer: { country: "US" } });
+    expect(q.isConverted).toBe(false);
+  });
+
+  it("stores a null tax rate when the provider returns no line items", async () => {
+    t.adapter.quote.mockResolvedValueOnce(providerQuote({ items: [] }));
+    const q = await createQuote(t.deps, { merchantId, productId, quantity: 1, buyer });
+    expect(q.taxRateBps).toBeNull();
   });
 
   it("refuses a product that is not agent-sellable", async () => {
@@ -93,6 +108,9 @@ describe("createQuote", () => {
     await expect(
       createQuote(t.deps, { merchantId, productId, quantity: 1, buyer: { country: "Germany" } }),
     ).rejects.toThrow(InvalidInputError);
+    await expect(createQuote(t.deps, { merchantId, productId, quantity: 0, buyer })).rejects.toMatchObject({
+      code: "INVALID_INPUT",
+    });
   });
 });
 

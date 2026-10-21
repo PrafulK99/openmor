@@ -136,6 +136,12 @@ model Quote {
   // Subscription follow-on pricing from the preview's recurring_breakup.
   recurringBreakup Json?
 
+  // Tax rate of the quoted product in basis points (1900 = 19%). Null if the provider gave none.
+  taxRateBps  Int?
+  // True when the quote currency differs from the product's list currency (provider FX
+  // conversion). Converted totals can drift with exchange rates: see the FX drift policy.
+  isConverted Boolean @default(false)
+
   // False when the provider reports is_byop (tax not included): not binding.
   isBinding Boolean     @default(true)
   status    QuoteStatus @default(open)

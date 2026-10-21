@@ -7,6 +7,7 @@ export const ERROR_CODES = [
   "BUYER_NOT_LINKED",
   "PROVIDER_ERROR",
   "MERCHANT_NOT_FOUND",
+  "INVALID_INPUT",
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];
@@ -38,10 +39,10 @@ export class ProviderError extends OpenMorError {
   }
 }
 
-/** Bad caller input (e.g. a malformed slug). Not an agent-facing error code: protocol layers validate first. */
-export class InvalidInputError extends Error {
+/** Bad caller input (e.g. quantity 0, a malformed country or slug). Code INVALID_INPUT. */
+export class InvalidInputError extends OpenMorError {
   constructor(message: string) {
-    super(message);
+    super("INVALID_INPUT", message);
     this.name = "InvalidInputError";
   }
 }

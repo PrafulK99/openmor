@@ -24,7 +24,7 @@ const DEFAULTS: Record<ModelName, Row> = {
     networkOptIn: false,
   },
   product: { description: null, imageUrl: null, isRecurring: false, agentSellable: false, active: true, providerData: null },
-  quote: { agentSessionId: null, quantity: 1, state: null, zip: null, discountCodes: [], discountAmount: 0, recurringBreakup: null, isBinding: true, status: "open" },
+  quote: { agentSessionId: null, quantity: 1, state: null, zip: null, discountCodes: [], discountAmount: 0, recurringBreakup: null, taxRateBps: null, isConverted: false, isBinding: true, status: "open" },
 };
 
 const UNIQUE: Record<ModelName, string[][]> = {
