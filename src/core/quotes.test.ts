@@ -57,6 +57,12 @@ describe("createQuote", () => {
     expect(q.recurring).toEqual({ subtotal: 445, discount: 0, tax: 85, total: 530 });
   });
 
+  it("attaches the agent session id when given", async () => {
+    const q = await createQuote(t.deps, { merchantId, productId, quantity: 1, buyer, agentSessionId: "ags_1" });
+    expect(q.agentSessionId).toBe("ags_1");
+    expect(t.db.tables.quote[0]!.agentSessionId).toBe("ags_1");
+  });
+
   it("marks a same-currency quote as not converted", async () => {
     t.adapter.quote.mockResolvedValueOnce(providerQuote({ currency: "USD" }));
     const q = await createQuote(t.deps, { merchantId, productId, quantity: 1, buyer: { country: "US" } });

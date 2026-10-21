@@ -1,6 +1,7 @@
 import type { Quote } from "@/generated/prisma/client";
 import { nowFrom, type CoreDeps } from "@/core/deps";
-import { InvalidInputError, OpenMorError } from "@/core/errors";
+import { InvalidInputError } from "@/core/errors";
+import { loadSellable } from "@/core/products";
 import type { QuoteBreakup } from "@/core/types";
 
 export const QUOTE_TTL_MS = 15 * 60 * 1000;
@@ -20,12 +21,15 @@ export interface CreateQuoteInput {
   productId: string;
   quantity: number;
   buyer: BuyerLocation;
+  /** The AgentSession that asked for this quote, if known. */
+  agentSessionId?: string;
 }
 
 export interface QuoteView {
   id: string;
   merchantId: string;
   productId: string;
+  agentSessionId: string | null;
   quantity: number;
   country: string;
   state: string | null;
@@ -52,6 +56,7 @@ function toView(q: Quote): QuoteView {
     id: q.id,
     merchantId: q.merchantId,
     productId: q.productId,
+    agentSessionId: q.agentSessionId,
     quantity: q.quantity,
     country: q.country,
     state: q.state,
@@ -97,18 +102,7 @@ function validate(input: CreateQuoteInput) {
 export async function createQuote(deps: CoreDeps, input: CreateQuoteInput): Promise<QuoteView> {
   const { quantity, country, state, zip, discountCodes } = validate(input);
 
-  const merchant = await deps.db.merchant.findUnique({ where: { id: input.merchantId } });
-  if (!merchant || !merchant.networkOptIn) {
-    throw new OpenMorError("MERCHANT_NOT_FOUND", `No merchant "${input.merchantId}" in the network`);
-  }
-
-  const product = await deps.db.product.findUnique({ where: { id: input.productId } });
-  if (!product || product.merchantId !== merchant.id || !product.active || !product.agentSellable) {
-    throw new OpenMorError(
-      "PRODUCT_UNAVAILABLE",
-      `Product "${input.productId}" is not available from this merchant`,
-    );
-  }
+  const { merchant, product } = await loadSellable(deps, input.merchantId, input.productId);
 
   const preview = await deps.adapterFor(merchant).quote({
     items: [{ productId: product.providerProductId, quantity }],
@@ -127,6 +121,7 @@ export async function createQuote(deps: CoreDeps, input: CreateQuoteInput): Prom
     data: {
       merchantId: merchant.id,
       productId: product.id,
+      agentSessionId: input.agentSessionId ?? null,
       quantity,
       country,
       state: state ?? null,

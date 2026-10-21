@@ -7,13 +7,14 @@ import type { PrismaClient } from "@/generated/prisma/client";
 type Row = Record<string, unknown>;
 type Where = Record<string, unknown>;
 
-type ModelName = "merchant" | "product" | "quote";
+type ModelName = "merchant" | "product" | "quote" | "agentSession";
 
 // To-one relations: field name -> [model, foreign key].
 const RELATIONS: Record<ModelName, Record<string, [ModelName, string]>> = {
   merchant: {},
   product: { merchant: ["merchant", "merchantId"] },
   quote: { merchant: ["merchant", "merchantId"], product: ["product", "productId"] },
+  agentSession: {},
 };
 
 const DEFAULTS: Record<ModelName, Row> = {
@@ -25,12 +26,14 @@ const DEFAULTS: Record<ModelName, Row> = {
   },
   product: { description: null, imageUrl: null, isRecurring: false, agentSellable: false, active: true, providerData: null },
   quote: { agentSessionId: null, quantity: 1, state: null, zip: null, discountCodes: [], discountAmount: 0, recurringBreakup: null, taxRateBps: null, isConverted: false, isBinding: true, status: "open" },
+  agentSession: { clientName: null, expiresAt: null },
 };
 
 const UNIQUE: Record<ModelName, string[][]> = {
   merchant: [["slug"], ["email"]],
   product: [["merchantId", "providerProductId"]],
   quote: [],
+  agentSession: [["tokenHash"]],
 };
 
 function uniqueViolation(): Error {
@@ -38,7 +41,7 @@ function uniqueViolation(): Error {
 }
 
 export class FakeDb {
-  readonly tables: Record<ModelName, Row[]> = { merchant: [], product: [], quote: [] };
+  readonly tables: Record<ModelName, Row[]> = { merchant: [], product: [], quote: [], agentSession: [] };
   #seq = 0;
   #clock: () => Date;
 
@@ -49,6 +52,7 @@ export class FakeDb {
   readonly merchant = this.#model("merchant");
   readonly product = this.#model("product");
   readonly quote = this.#model("quote");
+  readonly agentSession = this.#model("agentSession");
 
   asPrisma(): PrismaClient {
     return this as unknown as PrismaClient;

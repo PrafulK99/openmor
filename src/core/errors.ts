@@ -8,6 +8,8 @@ export const ERROR_CODES = [
   "PROVIDER_ERROR",
   "MERCHANT_NOT_FOUND",
   "INVALID_INPUT",
+  // Something failed inside OpenMoR (e.g. the database). Details are never shown to agents.
+  "INTERNAL_ERROR",
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];
