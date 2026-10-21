@@ -61,7 +61,8 @@ export function toOrderView(o: OrderWithProduct): OrderView {
     checkoutUrl: o.checkoutUrl,
     quoted: { currency: o.currency, tax: o.taxAmount, total: o.totalAmount },
     charged:
-      o.chargedCurrency !== null && o.chargedTotalAmount !== null
+      // Loose checks: treat a missing column (undefined) like NULL, never as a charge.
+      o.chargedCurrency != null && o.chargedTotalAmount != null
         ? { currency: o.chargedCurrency, tax: o.chargedTaxAmount ?? 0, total: o.chargedTotalAmount }
         : null,
     paidAt: o.paidAt,
