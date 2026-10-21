@@ -2,6 +2,7 @@
 import { CLIENT_INFO_META_KEY, type McpServer, type ServerContext } from "@modelcontextprotocol/server";
 import { touchAgentSession } from "@/core/agent-sessions";
 import type { CoreDeps } from "@/core/deps";
+import { portable } from "./portable-schema";
 import { currentRequestInfo } from "./request-info";
 import type { ToolDefinition } from "./tool";
 import { getProductTool } from "./tools/get-product";
@@ -68,8 +69,8 @@ export function registerOpenMorTools(server: McpServer, deps: CoreDeps): void {
       {
         title: tool.title,
         description: tool.description,
-        inputSchema: tool.inputSchema,
-        outputSchema: tool.outputSchema,
+        inputSchema: portable(tool.inputSchema),
+        outputSchema: portable(tool.outputSchema),
         annotations: tool.annotations,
       },
       async (input, ctx) => {

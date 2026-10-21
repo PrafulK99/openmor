@@ -42,7 +42,10 @@ describe("registerOpenMorTools", () => {
     expect([...tools.keys()]).toEqual(["search_products", "get_product", "get_quote"]);
     for (const def of TOOLS) {
       const { config } = tools.get(def.name)!;
-      expect(config).toMatchObject({ description: def.description, inputSchema: def.inputSchema, outputSchema: def.outputSchema });
+      expect(config).toMatchObject({ description: def.description, annotations: def.annotations });
+      // Wrapped for portable JSON Schema, but validation is still zod's.
+      const out = (config.outputSchema as { "~standard": { validate: unknown; vendor: string } })["~standard"];
+      expect(out.validate).toBe(def.outputSchema["~standard"].validate);
     }
   });
 
