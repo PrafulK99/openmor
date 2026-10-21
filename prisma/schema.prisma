@@ -1,0 +1,11 @@
+// OpenMoR database schema. Models are added per milestone; none yet.
+// Connection URL lives in prisma.config.ts (Prisma 7), read from DATABASE_URL.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}

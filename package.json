@@ -1,0 +1,48 @@
+{
+  "name": "openmor",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Open-source layer that lets AI agents discover, quote, buy and receive digital products from merchant-of-record sellers.",
+  "license": "Apache-2.0",
+  "author": "Praful Kharpuriye (https://github.com/PrafulK99)",
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@10.13.1",
+  "scripts": {
+    "dev": "next dev",
+    "build": "prisma generate && next build",
+    "start": "next start",
+    "typecheck": "prisma generate && next typegen && tsc --noEmit",
+    "lint": "eslint .",
+    "test": "cross-env NODE_ENV=test vitest run",
+    "test:watch": "cross-env NODE_ENV=test vitest",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:studio": "prisma studio",
+    "postinstall": "prisma generate"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "^7.10.1",
+    "@prisma/client": "^7.10.1",
+    "next": "16.4.2",
+    "pg": "^8.23.1",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/pg": "^8.23.1",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@vitest/coverage-v8": "^5.0.5",
+    "cross-env": "^10.1.0",
+    "dotenv": "^18.0.8",
+    "eslint": "^9",
+    "eslint-config-next": "16.4.2",
+    "prisma": "^7.10.1",
+    "typescript": "^5",
+    "vitest": "^5.0.5"
+  }
+}
