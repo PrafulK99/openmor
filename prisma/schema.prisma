@@ -1,5 +1,14 @@
-// OpenMoR database schema. Models are added per milestone; none yet.
-// Connection URL lives in prisma.config.ts (Prisma 7), read from DATABASE_URL.
+// OpenMoR database schema.
+//
+// Conventions:
+// - Money is integer minor units (cents/paise) in `Int` columns, always paired
+//   with an ISO 4217 `currency`. Never floats.
+// - Secrets (merchant Dodo API keys, webhook secrets) are stored only as
+//   AES-256-GCM ciphertext produced by src/lib/crypto.ts.
+// - Bearer-style tokens (agent sessions, buyer approval links) are stored only
+//   as SHA-256 hashes; the raw token is shown once and never persisted.
+// - Connection URLs live in prisma.config.ts (CLI, DIRECT_URL) and
+//   src/lib/db.ts (runtime, DATABASE_URL).
 
 generator client {
   provider = "prisma-client"
@@ -8,4 +17,231 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+}
+
+enum DodoEnvironment {
+  test_mode
+  live_mode
+}
+
+enum QuoteStatus {
+  open
+  used
+  expired
+}
+
+enum OrderStatus {
+  pending_payment
+  paid
+  fulfilled
+  failed
+  cancelled
+  refunded
+}
+
+enum CheckoutMode {
+  handoff
+  saved_method
+}
+
+enum BuyerLinkStatus {
+  pending_approval
+  active
+  revoked
+  expired
+}
+
+model Merchant {
+  id    String @id @default(cuid())
+  name  String @db.VarChar(200)
+  slug  String @unique @db.VarChar(64)
+  email String @unique @db.VarChar(320)
+
+  // AES-256-GCM ciphertext (see src/lib/crypto.ts). Never returned by any API or tool.
+  dodoApiKeyEncrypted        String
+  dodoWebhookSecretEncrypted String?
+
+  // Test mode is the default. Live mode needs both fields set explicitly.
+  dodoEnvironment DodoEnvironment @default(test_mode)
+  liveModeEnabled Boolean         @default(false)
+
+  // Listed in the agent network (search_products) only after opting in.
+  networkOptIn Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  products   Product[]
+  quotes     Quote[]
+  orders     Order[]
+  buyerLinks BuyerLink[]
+}
+
+// Cache of the merchant's provider catalog, refreshed by sync. The provider is
+// the source of truth for price; quotes always re-run a provider preview.
+model Product {
+  id                String @id @default(cuid())
+  merchantId        String
+  providerProductId String @db.VarChar(128)
+
+  // Merchant-supplied text is data, length-limited, never instructions.
+  name        String  @db.VarChar(200)
+  description String? @db.VarChar(2000)
+  imageUrl    String? @db.VarChar(2048)
+
+  // List price in minor units, before tax/discount.
+  priceAmount Int
+  currency    String  @db.Char(3)
+  isRecurring Boolean @default(false)
+
+  // Merchant chose to expose this product to agents.
+  agentSellable Boolean @default(false)
+  // Still exists and is purchasable on the provider side.
+  active        Boolean @default(true)
+
+  // Raw provider payload for debugging/fulfillment mapping. Not exposed to agents.
+  providerData Json?
+
+  syncedAt  DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  merchant Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  quotes   Quote[]
+
+  @@unique([merchantId, providerProductId])
+  @@index([agentSellable, active])
+}
+
+// A binding price from the provider's checkout preview. Agents reference it by
+// id; checkout re-runs the preview and refuses with PRICE_CHANGED if the total moved.
+model Quote {
+  id             String  @id @default(cuid())
+  merchantId     String
+  productId      String
+  agentSessionId String?
+
+  quantity      Int      @default(1)
+  country       String   @db.Char(2)
+  state         String?  @db.VarChar(64)
+  zip           String?  @db.VarChar(32)
+  discountCodes String[] @default([])
+
+  currency       String @db.Char(3)
+  subtotalAmount Int
+  discountAmount Int    @default(0)
+  taxAmount      Int
+  totalAmount    Int
+
+  // Subscription follow-on pricing from the preview's recurring_breakup.
+  recurringBreakup Json?
+
+  // False when the provider reports is_byop (tax not included): not binding.
+  isBinding Boolean     @default(true)
+  status    QuoteStatus @default(open)
+  expiresAt DateTime
+  createdAt DateTime    @default(now())
+
+  merchant     Merchant      @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  product      Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  agentSession AgentSession? @relation(fields: [agentSessionId], references: [id], onDelete: SetNull)
+  orders       Order[]
+
+  @@index([merchantId, createdAt])
+  @@index([expiresAt])
+}
+
+model Order {
+  id             String  @id @default(cuid())
+  merchantId     String
+  quoteId        String
+  buyerLinkId    String?
+  agentSessionId String?
+
+  // sha256(quote_id + normalized buyer email). A repeat checkout returns this order.
+  idempotencyKey String @unique @db.Char(64)
+  buyerEmail     String @db.VarChar(320)
+
+  status       OrderStatus  @default(pending_payment)
+  checkoutMode CheckoutMode
+
+  // Amounts actually charged, copied from the quote that passed re-preview.
+  currency    String @db.Char(3)
+  taxAmount   Int
+  totalAmount Int
+
+  providerCheckoutSessionId String? @unique @db.VarChar(128)
+  providerPaymentId         String? @unique @db.VarChar(128)
+  checkoutUrl               String? @db.VarChar(2048)
+
+  // What the buyer received: license keys, entitlements, downloads, etc.
+  fulfillment Json?
+
+  paidAt    DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  merchant     Merchant      @relation(fields: [merchantId], references: [id], onDelete: Restrict)
+  quote        Quote         @relation(fields: [quoteId], references: [id], onDelete: Restrict)
+  buyerLink    BuyerLink?    @relation(fields: [buyerLinkId], references: [id], onDelete: SetNull)
+  agentSession AgentSession? @relation(fields: [agentSessionId], references: [id], onDelete: SetNull)
+
+  @@index([merchantId, createdAt])
+  @@index([buyerEmail])
+}
+
+// A buyer's email-approved spending permission for an agent, scoped to one
+// merchant (provider customers and saved methods are per merchant account).
+model BuyerLink {
+  id             String  @id @default(cuid())
+  merchantId     String
+  agentSessionId String?
+
+  buyerEmail String          @db.VarChar(320)
+  status     BuyerLinkStatus @default(pending_approval)
+
+  // SHA-256 of the one-time approval token emailed to the buyer.
+  approvalTokenHash String    @unique @db.Char(64)
+  approvedAt        DateTime?
+  revokedAt         DateTime?
+  expiresAt         DateTime
+
+  // Caps in minor units of `currency`. Null means no cap of that kind.
+  currency          String @db.Char(3)
+  perOrderCapAmount Int?
+  totalCapAmount    Int?
+  spentAmount       Int    @default(0)
+
+  // Product ids this link may buy. Empty means any agent-sellable product of the merchant.
+  productScope String[] @default([])
+
+  // Provider references only (ids, not card data): a saved method lives at the provider.
+  providerCustomerId      String? @db.VarChar(128)
+  providerPaymentMethodId String? @db.VarChar(128)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  merchant     Merchant      @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  agentSession AgentSession? @relation(fields: [agentSessionId], references: [id], onDelete: SetNull)
+  orders       Order[]
+
+  @@index([merchantId, buyerEmail])
+}
+
+// An AI agent client talking to OpenMoR (e.g. one MCP connection).
+model AgentSession {
+  id        String  @id @default(cuid())
+  // SHA-256 of the session bearer token.
+  tokenHash String  @unique @db.Char(64)
+  // Self-reported client name, e.g. "claude-code". Data, not trusted.
+  clientName String? @db.VarChar(200)
+
+  createdAt  DateTime  @default(now())
+  lastSeenAt DateTime  @default(now())
+  expiresAt  DateTime?
+
+  quotes     Quote[]
+  orders     Order[]
+  buyerLinks BuyerLink[]
 }
