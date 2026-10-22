@@ -32,6 +32,7 @@ src/
 - Every result from `search_products` carries `merchant_id`; `get_product` and `get_quote` require it.
 - Error codes are stable strings: `QUOTE_EXPIRED`, `QUOTE_USED` (the quote already backs an order for a different buyer email), `PRICE_CHANGED`, `PRODUCT_UNAVAILABLE`, `LIMIT_EXCEEDED`, `BUYER_NOT_LINKED`, `PROVIDER_ERROR`, `MERCHANT_NOT_FOUND`, `ORDER_NOT_FOUND` (unknown order id), `INVALID_INPUT` (bad caller input, e.g. quantity 0 or a malformed country; raised as `InvalidInputError`), `INTERNAL_ERROR` (an OpenMoR-side failure such as the database; agents get a generic message, never internal details). The list lives in `src/core/errors.ts`.
 - Every tool returns typed JSON plus a short human-readable `summary` string.
+- Every tool call runs under one 25 s deadline (`src/core/deadline.ts`). Adapters pass its signal to every provider request, so a slow provider ends as `PROVIDER_ERROR` inside the 30 s `/api/mcp` limit.
 - FX drift policy. Dodo converts list prices into the buyer's currency at live exchange rates, so the same quote can come out a little different minutes later. `Quote.isConverted` is true when the quote currency differs from the product's list currency.
   - Handoff checkout accepts drift: the buyer sees and confirms the final amount on Dodo's hosted page.
   - Saved-method checkout charges only if the re-preview total is at most 1% above the quoted total AND within the buyer link's caps (per order and total). Otherwise refuse with `PRICE_CHANGED` and return a fresh quote. A lower total is always fine.

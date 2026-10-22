@@ -34,9 +34,10 @@ export class ProviderError extends OpenMorError {
   readonly status: number | undefined;
   readonly providerMessage: string;
 
-  constructor(provider: string, status: number | undefined, providerMessage: string) {
+  /** `message` replaces the default "<provider> request failed: ..." text agents see. */
+  constructor(provider: string, status: number | undefined, providerMessage: string, message?: string) {
     const where = status === undefined ? "request failed" : `returned HTTP ${status}`;
-    super("PROVIDER_ERROR", `${provider} ${where}: ${providerMessage}`);
+    super("PROVIDER_ERROR", message ?? `${provider} ${where}: ${providerMessage}`);
     this.name = "ProviderError";
     this.provider = provider;
     this.status = status;

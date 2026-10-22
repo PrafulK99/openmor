@@ -1,4 +1,4 @@
-import { APIError } from "dodopayments";
+import { APIConnectionTimeoutError, APIError } from "dodopayments";
 import type { CheckoutSessionPreviewResponse } from "dodopayments/resources/checkout-sessions";
 import type { Product as DodoProduct, ProductListResponse } from "dodopayments/resources/products/products";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -124,6 +124,9 @@ describe("DodoAdapter construction", () => {
       environment: "test_mode",
       baseURL: null,
       webhookKey: null,
+      timeout: 12_000,
+      maxRetries: 1,
+      fetch: expect.any(Function),
     });
   });
 
@@ -155,7 +158,7 @@ describe("listProducts / getProduct", () => {
   it("maps a subscription with billing interval and credits from the detail endpoint", async () => {
     sdk.retrieve.mockResolvedValue(fullSubscription);
     const p = await adapter().getProduct("pdt_sub");
-    expect(sdk.retrieve).toHaveBeenCalledWith("pdt_sub");
+    expect(sdk.retrieve).toHaveBeenCalledWith("pdt_sub", {});
     expect(p).toMatchObject({
       id: "pdt_sub",
       kind: "subscription",
@@ -186,7 +189,7 @@ describe("quote", () => {
     expect(sdk.preview).toHaveBeenCalledWith({
       product_cart: [{ product_id: "pdt_one", quantity: 1 }],
       billing_address: { country: "US", state: "CA", zipcode: "94102" },
-    });
+    }, {});
     expect(q).toEqual({
       currency: "EUR",
       subtotal: 4362,
@@ -270,6 +273,14 @@ describe("errors", () => {
     expect(err.status).toBe(401);
     expect(JSON.stringify({ ...err, message: err.message, stack: err.stack })).not.toContain(API_KEY);
     expect(err.message).toContain("[redacted]");
+  });
+
+  it("reports an SDK timeout as PROVIDER_ERROR without a status", async () => {
+    sdk.retrieve.mockRejectedValue(new APIConnectionTimeoutError());
+    const err = await adapter().getProduct("pdt_one").catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(ProviderError);
+    expect(err).toMatchObject({ code: "PROVIDER_ERROR", status: undefined });
+    expect((err as ProviderError).message).toMatch(/timed out/i);
   });
 
   it("wraps network errors without a status", async () => {
