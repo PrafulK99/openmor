@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { setup } from "@/test/core-fixtures";
 import { createOpenMorMcpHandler } from "./http";
+import * as route from "@/app/api/mcp/route";
 
 const VERSION = "2026-07-28";
 
@@ -88,5 +89,11 @@ describe("MCP HTTP endpoint", () => {
     const [msg] = messages(await readToEnd(res));
     const tools = (msg!.result as { tools: { name: string }[] }).tools.map((t) => t.name);
     expect(tools).toEqual(["search_products", "get_product", "get_quote", "checkout", "get_order"]);
+  });
+});
+
+describe("/api/mcp route", () => {
+  it("caps the function at 30 seconds", () => {
+    expect(route.maxDuration).toBe(30);
   });
 });
