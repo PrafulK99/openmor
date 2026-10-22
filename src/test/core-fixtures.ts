@@ -1,4 +1,5 @@
 // Shared setup for core tests: a FakeDb, a FakeAdapter, a controllable clock and deps.
+import { createHash } from "node:crypto";
 import { vi } from "vitest";
 import type { AdapterFor, CoreDeps } from "@/core/deps";
 import { encrypt } from "@/lib/crypto";
@@ -45,4 +46,30 @@ export function seedProduct(db: FakeDb, merchantId: string, overrides: Record<st
     active: true,
     ...overrides,
   }) as { id: string; providerProductId: string };
+}
+
+let linkSeq = 0;
+
+/** An active buyer link with a saved card on file. Caps are in EUR; override anything. */
+export function seedBuyerLink(db: FakeDb, merchantId: string, overrides: Record<string, unknown> = {}) {
+  const n = ++linkSeq;
+  return db.insert("buyerLink", {
+    merchantId,
+    buyerEmail: "buyer@example.com",
+    status: "active",
+    approvalTokenHash: createHash("sha256").update(`seed-token-${n}`).digest("hex"),
+    approvalExpiresAt: new Date("2026-10-21T12:30:00Z"),
+    approvedAt: new Date("2026-10-21T12:10:00Z"),
+    expiresAt: new Date("2026-12-31T00:00:00Z"),
+    currency: "EUR",
+    monthlyCapAmount: 10_000,
+    providerCustomerId: "cus_1",
+    providerPaymentMethodId: "pm_1",
+    ...overrides,
+  }) as {
+    id: string;
+    merchantId: string;
+    currency: string;
+    monthlyCapAmount: number;
+  };
 }

@@ -203,6 +203,7 @@ model Order {
 
   @@index([merchantId, createdAt])
   @@index([buyerEmail])
+  @@index([buyerLinkId, createdAt])
 }
 
 // A buyer's email-approved spending permission for an agent, scoped to one
@@ -215,17 +216,21 @@ model BuyerLink {
   buyerEmail String          @db.VarChar(320)
   status     BuyerLinkStatus @default(pending_approval)
 
-  // SHA-256 of the one-time approval token emailed to the buyer.
+  // SHA-256 of the one-time approval token emailed to the buyer. The raw token is never stored.
   approvalTokenHash String    @unique @db.Char(64)
+  // The emailed approval link stops working at this time (30 minutes after it is sent).
+  approvalExpiresAt DateTime
   approvedAt        DateTime?
   revokedAt         DateTime?
+  // When the permission itself ends (at most 90 days after it is created).
   expiresAt         DateTime
 
-  // Caps in minor units of `currency`. Null means no cap of that kind.
+  // Caps in minor units of `currency`. The monthly cap covers one calendar month (UTC).
+  // This month's spend is never stored: it is computed from the link's saved-method orders
+  // (see src/core/spend.ts). A null per-order cap means no per-order limit.
   currency          String @db.Char(3)
   perOrderCapAmount Int?
-  totalCapAmount    Int?
-  spentAmount       Int    @default(0)
+  monthlyCapAmount  Int
 
   // Product ids this link may buy. Empty means any agent-sellable product of the merchant.
   productScope String[] @default([])

@@ -8,7 +8,7 @@ import type { PrismaClient } from "@/generated/prisma/client";
 type Row = Record<string, unknown>;
 type Where = Record<string, unknown>;
 
-type ModelName = "merchant" | "product" | "quote" | "agentSession" | "order" | "webhookEvent";
+type ModelName = "merchant" | "product" | "quote" | "agentSession" | "order" | "webhookEvent" | "buyerLink";
 
 // To-one relations: field name -> [model, foreign key].
 const RELATIONS: Record<ModelName, Record<string, [ModelName, string]>> = {
@@ -16,7 +16,8 @@ const RELATIONS: Record<ModelName, Record<string, [ModelName, string]>> = {
   product: { merchant: ["merchant", "merchantId"] },
   quote: { merchant: ["merchant", "merchantId"], product: ["product", "productId"] },
   agentSession: {},
-  order: { merchant: ["merchant", "merchantId"], quote: ["quote", "quoteId"] },
+  order: { merchant: ["merchant", "merchantId"], quote: ["quote", "quoteId"], buyerLink: ["buyerLink", "buyerLinkId"] },
+  buyerLink: { merchant: ["merchant", "merchantId"] },
   webhookEvent: { merchant: ["merchant", "merchantId"], order: ["order", "orderId"] },
 };
 
@@ -44,6 +45,16 @@ const DEFAULTS: Record<ModelName, Row> = {
     paidAt: null,
   },
   webhookEvent: { orderId: null, processedAt: null },
+  buyerLink: {
+    agentSessionId: null,
+    status: "pending_approval",
+    approvedAt: null,
+    revokedAt: null,
+    perOrderCapAmount: null,
+    productScope: [],
+    providerCustomerId: null,
+    providerPaymentMethodId: null,
+  },
 };
 
 const UNIQUE: Record<ModelName, string[][]> = {
@@ -53,6 +64,7 @@ const UNIQUE: Record<ModelName, string[][]> = {
   agentSession: [["tokenHash"]],
   order: [["idempotencyKey"], ["providerCheckoutSessionId"], ["providerPaymentId"]],
   webhookEvent: [["merchantId", "webhookId"]],
+  buyerLink: [["approvalTokenHash"]],
 };
 
 function uniqueViolation(): Error {
@@ -60,7 +72,7 @@ function uniqueViolation(): Error {
 }
 
 export class FakeDb {
-  readonly tables: Record<ModelName, Row[]> = { merchant: [], product: [], quote: [], agentSession: [], order: [], webhookEvent: [] };
+  readonly tables: Record<ModelName, Row[]> = { merchant: [], product: [], quote: [], agentSession: [], order: [], webhookEvent: [], buyerLink: [] };
   #seq = 0;
   #clock: () => Date;
 
@@ -74,6 +86,12 @@ export class FakeDb {
   readonly agentSession = this.#model("agentSession");
   readonly order = this.#model("order");
   readonly webhookEvent = this.#model("webhookEvent");
+  readonly buyerLink = this.#model("buyerLink");
+
+  /** Stand-in for `$queryRaw` (used for `SELECT ... FOR UPDATE` row locks, which the fake does not need). */
+  async $queryRaw(): Promise<unknown[]> {
+    return [];
+  }
 
   /** Interactive transaction: runs fn against this fake and restores every table if it throws. */
   async $transaction<T>(fn: (tx: this) => Promise<T>): Promise<T> {
@@ -130,6 +148,18 @@ export class FakeDb {
       updateMany: async (args: { where?: Where; data: Row }) => {
         const rows = this.#rows(name, args.where);
         for (const r of rows) Object.assign(r, args.data, { updatedAt: this.#clock() });
+        return { count: rows.length };
+      },
+      count: async (args: { where?: Where } = {}) => this.#rows(name, args.where).length,
+      delete: async (args: { where: Where }) => {
+        const row = this.#rows(name, this.#expandUnique(args.where))[0];
+        if (!row) throw Object.assign(new Error("Record not found"), { code: "P2025" });
+        this.tables[name].splice(this.tables[name].indexOf(row), 1);
+        return structuredClone(row);
+      },
+      deleteMany: async (args: { where?: Where } = {}) => {
+        const rows = this.#rows(name, args.where);
+        for (const r of rows) this.tables[name].splice(this.tables[name].indexOf(r), 1);
         return { count: rows.length };
       },
       upsert: async (args: { where: Where; create: Row; update: Row; select?: Row }) => {
