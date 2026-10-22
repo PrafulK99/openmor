@@ -10,9 +10,10 @@ import { checkoutTool } from "./tools/checkout";
 import { getOrderTool } from "./tools/get-order";
 import { getProductTool } from "./tools/get-product";
 import { getQuoteTool } from "./tools/get-quote";
+import { linkBuyerTool } from "./tools/link-buyer";
 import { searchProductsTool } from "./tools/search-products";
 
-export const TOOLS: ToolDefinition[] = [searchProductsTool, getProductTool, getQuoteTool, checkoutTool, getOrderTool] as ToolDefinition[];
+export const TOOLS: ToolDefinition[] = [searchProductsTool, getProductTool, getQuoteTool, linkBuyerTool, checkoutTool, getOrderTool] as ToolDefinition[];
 
 export const SERVER_INSTRUCTIONS = [
   "OpenMoR lets you find and buy digital products from merchants that sell through a merchant of record.",

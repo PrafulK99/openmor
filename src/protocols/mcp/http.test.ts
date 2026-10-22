@@ -88,7 +88,7 @@ describe("MCP HTTP endpoint", () => {
     const res = await handler()(rpc("tools/list"));
     const [msg] = messages(await readToEnd(res));
     const tools = (msg!.result as { tools: { name: string }[] }).tools.map((t) => t.name);
-    expect(tools).toEqual(["search_products", "get_product", "get_quote", "checkout", "get_order"]);
+    expect(tools).toEqual(["search_products", "get_product", "get_quote", "link_buyer", "checkout", "get_order"]);
   });
 });
 

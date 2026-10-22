@@ -28,3 +28,26 @@ export async function withDeadline<T>(ms: number, fn: () => Promise<T>): Promise
     clearTimeout(timer);
   }
 }
+
+/** Thrown by raceDeadline when the deadline fires before the work finishes. */
+export class DeadlineExceededError extends Error {
+  constructor() {
+    super("The tool call's time budget ran out");
+    this.name = "DeadlineExceededError";
+  }
+}
+
+/**
+ * Reject as soon as the current deadline fires, even if the work cannot be cancelled (it keeps
+ * running in the background). Without a deadline, the work is returned as is.
+ */
+export function raceDeadline<T>(work: Promise<T>): Promise<T> {
+  const signal = currentDeadline();
+  if (!signal) return work;
+  if (signal.aborted) return Promise.reject(new DeadlineExceededError());
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(new DeadlineExceededError());
+    signal.addEventListener("abort", onAbort, { once: true });
+    work.then(resolve, reject).finally(() => signal.removeEventListener("abort", onAbort));
+  });
+}
