@@ -1,8 +1,6 @@
 // One MCP endpoint (streamable HTTP) for every merchant in the network.
-import { createMcpHandler } from "mcp-handler";
 import { getServerDeps } from "@/app/server-deps";
-import { registerOpenMorTools, SERVER_INSTRUCTIONS } from "@/protocols/mcp/server";
-import { withRequestInfo } from "@/protocols/mcp/request-info";
+import { createOpenMorMcpHandler } from "@/protocols/mcp/http";
 import pkg from "../../../../package.json";
 
 // No `runtime`/`dynamic` exports: Next 16 with cacheComponents rejects them. Route handlers
@@ -12,16 +10,7 @@ let handler: ((req: Request) => Promise<Response>) | undefined;
 
 // Built on first request so importing this route (e.g. during `next build`) needs no env vars.
 async function getHandler(): Promise<(req: Request) => Promise<Response>> {
-  if (handler) return handler;
-  const deps = await getServerDeps();
-  handler = withRequestInfo(
-    createMcpHandler((server) => registerOpenMorTools(server, deps), {
-      serverInfo: { name: "openmor", version: pkg.version },
-      instructions: SERVER_INSTRUCTIONS,
-      // Verbose logs print raw errors, which can hold tool arguments (buyer emails).
-      verboseLogs: false,
-    }),
-  );
+  handler ??= createOpenMorMcpHandler(await getServerDeps(), pkg.version);
   return handler;
 }
 
