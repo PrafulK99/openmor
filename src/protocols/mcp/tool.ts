@@ -1,11 +1,12 @@
 import type { CallToolResult, ToolAnnotations } from "@modelcontextprotocol/server";
 import type { z } from "zod";
-import type { CoreDeps } from "@/core/deps";
+import type { CheckoutDeps } from "@/core/checkout";
 import { toolError } from "./results";
 
 /** What a tool handler gets besides its arguments. */
 export interface ToolEnv {
-  deps: CoreDeps;
+  /** Core dependencies plus APP_URL (for checkout return links). */
+  deps: CheckoutDeps;
   /** The caller's AgentSession, when one could be created. */
   agentSessionId?: string;
 }

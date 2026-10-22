@@ -282,8 +282,8 @@ describe("errors", () => {
 
   it("throws a clear not-implemented error for unbuilt methods", async () => {
     const a: ProviderAdapter = adapter();
-    await expect(a.getPayment("pay_1")).rejects.toThrow(NotImplementedError);
-    await expect(a.getPayment("pay_1")).rejects.toThrow("DodoAdapter.getPayment is not implemented yet");
+    await expect(a.chargeSavedMethod({} as never)).rejects.toThrow(NotImplementedError);
+    await expect(a.chargeSavedMethod({} as never)).rejects.toThrow("DodoAdapter.chargeSavedMethod is not implemented yet");
     expect(() => a.paymentIdentity()).toThrow(NotImplementedError);
   });
 });

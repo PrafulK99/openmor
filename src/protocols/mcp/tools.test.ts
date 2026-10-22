@@ -30,7 +30,7 @@ const data = (r: CallToolResult) => r.structuredContent as Record<string, any>; 
 
 beforeEach(() => {
   t = setup(new Date("2026-10-21T12:00:00Z"));
-  env = { deps: t.deps };
+  env = { deps: { ...t.deps, appUrl: "http://localhost:3000" } };
   merchantId = seedMerchant(t.db).id;
   lifetimeId = seedProduct(t.db, merchantId, {
     providerProductId: "pdt_life",
@@ -169,7 +169,7 @@ describe("get_quote", () => {
     // First clock read stores the quote; the second builds the response 2 minutes later.
     const now = () => (calls++ === 0 ? created : new Date(created.getTime() + 120_000));
     const r = await call(
-      getQuoteTool.handler({ merchant_id: merchantId, product_id: lifetimeId, buyer_country: "IN" }, { deps: { ...t.deps, now } }),
+      getQuoteTool.handler({ merchant_id: merchantId, product_id: lifetimeId, buyer_country: "IN" }, { deps: { ...t.deps, now, appUrl: "http://localhost:3000" } }),
     );
     expect(data(r).expires_at).toBe("2026-10-21T19:37:00.000Z");
     expect(data(r).expires_at).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
@@ -182,7 +182,7 @@ describe("get_quote", () => {
     let calls = 0;
     const start = new Date("2026-10-21T12:00:00Z");
     const now = () => (calls++ === 0 ? start : new Date(start.getTime() + QUOTE_TTL_MS + 5_000));
-    const r = await call(getQuoteTool.handler({ merchant_id: merchantId, product_id: lifetimeId, buyer_country: "DE" }, { deps: { ...t.deps, now } }));
+    const r = await call(getQuoteTool.handler({ merchant_id: merchantId, product_id: lifetimeId, buyer_country: "DE" }, { deps: { ...t.deps, now, appUrl: "http://localhost:3000" } }));
     expect(data(r).expires_in_seconds).toBe(0);
     expect(text(r)).toMatch(/Quote valid for less than a minute \(until 12:15 UTC\)\.$/);
   });

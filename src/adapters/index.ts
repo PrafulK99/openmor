@@ -17,6 +17,9 @@ export function createAdapterFor(options: { encryptionKey?: Buffer } = {}): Adap
     new DodoAdapter({
       apiKey: decrypt(merchant.dodoApiKeyEncrypted, options.encryptionKey),
       environment: environmentFor(merchant),
+      webhookSecret: merchant.dodoWebhookSecretEncrypted
+        ? decrypt(merchant.dodoWebhookSecretEncrypted, options.encryptionKey)
+        : null,
     });
 }
 

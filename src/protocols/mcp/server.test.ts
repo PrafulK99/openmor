@@ -35,11 +35,11 @@ async function inRequest<T>(fn: () => Promise<T>, headers: Record<string, string
 }
 
 describe("registerOpenMorTools", () => {
-  it("registers the three tools with schemas and annotations", () => {
+  it("registers all five tools with schemas and annotations", () => {
     const t = setup();
     const { server, tools } = fakeServer();
-    registerOpenMorTools(server, t.deps);
-    expect([...tools.keys()]).toEqual(["search_products", "get_product", "get_quote"]);
+    registerOpenMorTools(server, { ...t.deps, appUrl: "http://localhost:3000" });
+    expect([...tools.keys()]).toEqual(["search_products", "get_product", "get_quote", "checkout", "get_order"]);
     for (const def of TOOLS) {
       const { config } = tools.get(def.name)!;
       expect(config).toMatchObject({ description: def.description, annotations: def.annotations });
@@ -54,7 +54,7 @@ describe("registerOpenMorTools", () => {
     const merchantId = seedMerchant(t.db).id;
     const productId = seedProduct(t.db, merchantId).id;
     const { server, tools } = fakeServer();
-    registerOpenMorTools(server, t.deps);
+    registerOpenMorTools(server, { ...t.deps, appUrl: "http://localhost:3000" });
     const ctx = ctxWith({ name: "claude-code", version: "2.1.0" });
     const headers = { "user-agent": "claude-code/2.1.0", "x-forwarded-for": "203.0.113.7, 10.0.0.1" };
 
@@ -77,7 +77,7 @@ describe("registerOpenMorTools", () => {
     const t = setup();
     vi.spyOn(t.db.agentSession, "upsert").mockRejectedValueOnce(new Error("db down"));
     const { server, tools } = fakeServer();
-    registerOpenMorTools(server, t.deps);
+    registerOpenMorTools(server, { ...t.deps, appUrl: "http://localhost:3000" });
     const r = (await inRequest(() => tools.get("search_products")!.cb({ query: "" }, ctxWith()))) as { isError?: boolean };
     expect(r.isError).toBeUndefined();
   });
@@ -94,7 +94,7 @@ describe("nameFromUserAgent", () => {
   it("names the session from the User-Agent when the client reports no name", async () => {
     const t = setup();
     const { server, tools } = fakeServer();
-    registerOpenMorTools(server, t.deps);
+    registerOpenMorTools(server, { ...t.deps, appUrl: "http://localhost:3000" });
     await inRequest(() => tools.get("search_products")!.cb({ query: "" }, ctxWith()), { "user-agent": "smoke-test/1.0" });
     expect(t.db.tables.agentSession[0]!.clientName).toBe("smoke-test");
   });

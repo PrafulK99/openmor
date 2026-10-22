@@ -1,12 +1,15 @@
 /** Stable error codes. Agents and clients match on these strings, so never rename them. */
 export const ERROR_CODES = [
   "QUOTE_EXPIRED",
+  // The quote already backs an order for a different buyer email. A quote checks out once.
+  "QUOTE_USED",
   "PRICE_CHANGED",
   "PRODUCT_UNAVAILABLE",
   "LIMIT_EXCEEDED",
   "BUYER_NOT_LINKED",
   "PROVIDER_ERROR",
   "MERCHANT_NOT_FOUND",
+  "ORDER_NOT_FOUND",
   "INVALID_INPUT",
   // Something failed inside OpenMoR (e.g. the database). Details are never shown to agents.
   "INTERNAL_ERROR",
@@ -46,6 +49,14 @@ export class InvalidInputError extends OpenMorError {
   constructor(message: string) {
     super("INVALID_INPUT", message);
     this.name = "InvalidInputError";
+  }
+}
+
+/** A webhook failed signature verification or could not be read. Answer HTTP 401; never log its body. */
+export class WebhookVerificationError extends Error {
+  constructor(reason: string) {
+    super(`Webhook rejected: ${reason}`);
+    this.name = "WebhookVerificationError";
   }
 }
 

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { InvalidInputError, OpenMorError, ProviderError } from "@/core/errors";
-import { createMerchant, getMerchantBySlug, setNetworkOptIn } from "@/core/merchants";
+import { createMerchant, getMerchantBySlug, setNetworkOptIn, setWebhookSecret } from "@/core/merchants";
 import { decrypt } from "@/lib/crypto";
 import { setup } from "@/test/core-fixtures";
 import { TEST_ENCRYPTION_KEY } from "@/test/keys";
@@ -80,5 +80,24 @@ describe("getMerchantBySlug / setNetworkOptIn", () => {
     const err = await getMerchantBySlug(t.deps, "nope").catch((e) => e);
     expect(err).toBeInstanceOf(OpenMorError);
     expect(err.code).toBe("MERCHANT_NOT_FOUND");
+  });
+});
+
+describe("setWebhookSecret", () => {
+  const SECRET = `whsec_${Buffer.alloc(32, 5).toString("base64")}`;
+
+  it("stores the secret encrypted and never returns it", async () => {
+    const m = await createMerchant(t.deps, input);
+    const view = await setWebhookSecret(t.deps, m.id, `  ${SECRET} `);
+    expect(JSON.stringify(view)).not.toContain(SECRET);
+    const stored = t.db.tables.merchant[0]!.dodoWebhookSecretEncrypted as string;
+    expect(stored).toMatch(/^v1:/);
+    expect(JSON.stringify(t.db.tables)).not.toContain(SECRET);
+    expect(decrypt(stored, TEST_ENCRYPTION_KEY)).toBe(SECRET);
+  });
+
+  it("rejects something that is not a whsec_ secret", async () => {
+    const m = await createMerchant(t.deps, input);
+    await expect(setWebhookSecret(t.deps, m.id, "dodo_test_sk_oops")).rejects.toMatchObject({ code: "INVALID_INPUT" });
   });
 });

@@ -108,3 +108,20 @@ export async function setNetworkOptIn(
     select: merchantViewSelect,
   });
 }
+
+// Standard Webhooks secrets from Dodo look like "whsec_" + base64.
+const WEBHOOK_SECRET = /^whsec_[A-Za-z0-9+/]{16,}={0,2}$/;
+
+/** Store the merchant's Dodo webhook signing secret, encrypted. Never returned afterwards. */
+export async function setWebhookSecret(deps: CoreDeps, merchantId: string, secret: string): Promise<MerchantView> {
+  const value = secret.trim();
+  if (!WEBHOOK_SECRET.test(value)) {
+    throw new InvalidInputError('Webhook secret must look like "whsec_..." as shown in the Dodo dashboard');
+  }
+  await loadMerchantWithConfig(deps, merchantId);
+  return deps.db.merchant.update({
+    where: { id: merchantId },
+    data: { dodoWebhookSecretEncrypted: encrypt(value) },
+    select: merchantViewSelect,
+  });
+}

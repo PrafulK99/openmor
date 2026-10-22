@@ -7,7 +7,10 @@ import type { ProviderAdapter } from "@/core/types";
 export type MerchantProviderConfig = Pick<
   Merchant,
   "dodoApiKeyEncrypted" | "dodoEnvironment" | "liveModeEnabled"
->;
+> & {
+  /** Needed only to verify webhooks; absent until the merchant runs merchant:webhook. */
+  dodoWebhookSecretEncrypted?: string | null;
+};
 
 export type AdapterFor = (merchant: MerchantProviderConfig) => ProviderAdapter;
 
