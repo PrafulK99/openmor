@@ -158,7 +158,7 @@ describe("listProducts / getProduct", () => {
   it("maps a subscription with billing interval and credits from the detail endpoint", async () => {
     sdk.retrieve.mockResolvedValue(fullSubscription);
     const p = await adapter().getProduct("pdt_sub");
-    expect(sdk.retrieve).toHaveBeenCalledWith("pdt_sub");
+    expect(sdk.retrieve).toHaveBeenCalledWith("pdt_sub", {});
     expect(p).toMatchObject({
       id: "pdt_sub",
       kind: "subscription",
@@ -189,7 +189,7 @@ describe("quote", () => {
     expect(sdk.preview).toHaveBeenCalledWith({
       product_cart: [{ product_id: "pdt_one", quantity: 1 }],
       billing_address: { country: "US", state: "CA", zipcode: "94102" },
-    });
+    }, {});
     expect(q).toEqual({
       currency: "EUR",
       subtotal: 4362,

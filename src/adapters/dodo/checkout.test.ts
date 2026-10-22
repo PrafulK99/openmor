@@ -82,7 +82,7 @@ describe("createCheckout", () => {
       billing_address: { country: "US", state: "CA", zipcode: "94102" },
       return_url: "http://localhost:3000/orders/ord_1",
       metadata: { openmor_order_id: "ord_1" },
-    });
+    }, {});
     expect(s).toEqual({ sessionId: "cks_9", checkoutUrl: "https://test.checkout/cks_9" });
   });
 
@@ -151,12 +151,12 @@ describe("getPayment / getFulfillment", () => {
     stubRest();
 
     const f = await adapter().getFulfillment("pay_1");
-    expect(sdk.retrieveProduct).toHaveBeenCalledWith("pdt_life");
+    expect(sdk.retrieveProduct).toHaveBeenCalledWith("pdt_life", {});
     // Only the license_key entitlement is queried, filtered to this customer.
     expect(sdk.listGrants).toHaveBeenCalledTimes(1);
-    expect(sdk.listGrants).toHaveBeenCalledWith("ent_key", { customer_id: "cus_1" });
+    expect(sdk.listGrants).toHaveBeenCalledWith("ent_key", { customer_id: "cus_1" }, {});
     expect(sdk.listLicenseKeys).not.toHaveBeenCalled();
-    expect(sdk.createPortal).toHaveBeenCalledWith("cus_1", { send_email: false });
+    expect(sdk.createPortal).toHaveBeenCalledWith("cus_1", { send_email: false }, {});
     expect(f).toEqual({
       paymentId: "pay_1",
       licenseKeys: [{ id: "lic_1", key: "KEY-OURS", status: "active", activationsLimit: 3, expiresAt: null }],
@@ -192,7 +192,7 @@ describe("getPayment / getFulfillment", () => {
     );
     stubRest();
     const f = await adapter().getFulfillment("pay_1");
-    expect(sdk.retrieveProduct).toHaveBeenCalledWith("pdt_pro");
+    expect(sdk.retrieveProduct).toHaveBeenCalledWith("pdt_pro", {});
     expect(f.subscription).toEqual({ id: "sub_1", status: "active", nextBillingDate: "2026-11-21T00:00:00Z" });
     expect(f.licenseKeys.map((k) => k.key)).toEqual(["K3"]);
   });
@@ -209,7 +209,7 @@ describe("getPayment / getFulfillment", () => {
     stubRest();
     const f = await adapter().getFulfillment("pay_1");
     expect(sdk.listGrants).not.toHaveBeenCalled();
-    expect(sdk.listLicenseKeys).toHaveBeenCalledWith({ customer_id: "cus_1", product_id: "pdt_life" });
+    expect(sdk.listLicenseKeys).toHaveBeenCalledWith({ customer_id: "cus_1", product_id: "pdt_life" }, {});
     expect(f.licenseKeys.map((k) => k.key)).toEqual(["KEY-LEGACY"]);
   });
 

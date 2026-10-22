@@ -1,6 +1,7 @@
 // The only module that talks to the Dodo Payments SDK.
 import DodoPayments, { APIError } from "dodopayments";
 import type { CountryCode } from "dodopayments/resources/misc";
+import { currentDeadline } from "@/core/deadline";
 import { NotImplementedError, ProviderError, WebhookVerificationError } from "@/core/errors";
 import type {
   CheckoutInput,
@@ -27,7 +28,12 @@ export interface DodoAdapterOptions {
   webhookSecret?: string | null;
 }
 
+/** The SDK's per-request options (it does not export the type publicly). */
+type RequestOptions = NonNullable<Parameters<DodoPayments["products"]["retrieve"]>[1]>;
+
 const PROVIDER = "Dodo Payments";
+/** What the agent sees when a tool call's deadline cuts Dodo off. */
+export const DODO_SLOW_MESSAGE = "Dodo is slow right now, try again in a minute";
 const WEBHOOK_HEADERS = ["webhook-id", "webhook-timestamp", "webhook-signature"] as const;
 
 function billingAddress(q: QuoteInput) {
@@ -54,9 +60,9 @@ export class DodoAdapter implements ProviderAdapter {
   }
 
   async listProducts(): Promise<Product[]> {
-    return this.#call(async () => {
+    return this.#call(async (opts) => {
       const products: Product[] = [];
-      for await (const p of this.#client.products.list()) {
+      for await (const p of this.#client.products.list(undefined, opts)) {
         products.push(mapListedProduct(p));
       }
       return products;
@@ -64,31 +70,37 @@ export class DodoAdapter implements ProviderAdapter {
   }
 
   async getProduct(productId: string): Promise<Product> {
-    return this.#call(async () => mapProduct(await this.#client.products.retrieve(productId)));
+    return this.#call(async (opts) => mapProduct(await this.#client.products.retrieve(productId, opts)));
   }
 
   async quote(input: QuoteInput): Promise<ProviderQuote> {
-    const preview = await this.#call(() =>
-      this.#client.checkoutSessions.preview({
+    const preview = await this.#call((opts) =>
+      this.#client.checkoutSessions.preview(
+        {
         product_cart: input.items.map((i) => ({ product_id: i.productId, quantity: i.quantity })),
         billing_address: billingAddress(input),
-        ...(input.discountCodes?.length ? { discount_codes: input.discountCodes } : {}),
-      }),
+          ...(input.discountCodes?.length ? { discount_codes: input.discountCodes } : {}),
+        },
+        opts,
+      ),
     );
     return mapQuote(preview);
   }
 
   /** Hosted (handoff) checkout: the buyer pays on Dodo's page. No card data touches OpenMoR. */
   async createCheckout(input: CheckoutInput): Promise<CheckoutSession> {
-    const session = await this.#call(() =>
-      this.#client.checkoutSessions.create({
+    const session = await this.#call((opts) =>
+      this.#client.checkoutSessions.create(
+        {
         product_cart: input.quote.items.map((i) => ({ product_id: i.productId, quantity: i.quantity })),
         customer: { email: input.customer.email, ...(input.customer.name ? { name: input.customer.name } : {}) },
         billing_address: billingAddress(input.quote),
         ...(input.quote.discountCodes?.length ? { discount_codes: input.quote.discountCodes } : {}),
         return_url: input.returnUrl,
-        ...(input.metadata ? { metadata: input.metadata } : {}),
-      }),
+          ...(input.metadata ? { metadata: input.metadata } : {}),
+        },
+        opts,
+      ),
     );
     if (!session.checkout_url) {
       throw new ProviderError(PROVIDER, undefined, "checkout session has no checkout_url");
@@ -101,7 +113,7 @@ export class DodoAdapter implements ProviderAdapter {
   }
 
   async getPayment(paymentId: string): Promise<Payment> {
-    return this.#call(async () => mapPayment(await this.#client.payments.retrieve(paymentId)));
+    return this.#call(async (opts) => mapPayment(await this.#client.payments.retrieve(paymentId, opts)));
   }
 
   /**
@@ -109,12 +121,12 @@ export class DodoAdapter implements ProviderAdapter {
    * callers pass it straight to the buyer's agent and must not store or log it.
    */
   async getFulfillment(paymentId: string): Promise<Fulfillment> {
-    return this.#call(async () => {
-      const payment = await this.#client.payments.retrieve(paymentId);
+    return this.#call(async (opts) => {
+      const payment = await this.#client.payments.retrieve(paymentId, opts);
       const customerId = payment.customer?.customer_id;
       const subscriptionId = payment.subscription_id ?? null;
 
-      const subscription = subscriptionId ? await this.#client.subscriptions.retrieve(subscriptionId) : null;
+      const subscription = subscriptionId ? await this.#client.subscriptions.retrieve(subscriptionId, opts) : null;
       const productIds = new Set([
         ...(payment.product_cart ?? []).map((p) => p.product_id),
         ...(subscription ? [subscription.product_id] : []),
@@ -128,7 +140,7 @@ export class DodoAdapter implements ProviderAdapter {
       const licenseKeys: DeliveredLicenseKey[] = [];
       if (customerId) {
         for (const productId of productIds) {
-          const product = await this.#client.products.retrieve(productId);
+          const product = await this.#client.products.retrieve(productId, opts);
           const entitlementIds = product.entitlements
             .filter((e) => e.integration_type === "license_key")
             .map((e) => e.id);
@@ -136,7 +148,7 @@ export class DodoAdapter implements ProviderAdapter {
           // Current model: licence keys are an entitlement on the product, delivered as grants.
           // Grants can be filtered by customer, not payment, so the payment is matched here.
           for (const entitlementId of entitlementIds) {
-            for await (const g of this.#client.entitlements.grants.list(entitlementId, { customer_id: customerId })) {
+            for await (const g of this.#client.entitlements.grants.list(entitlementId, { customer_id: customerId }, opts)) {
               if (g.integration_type !== "license_key" || !ours(g) || g.status === "Revoked" || g.status === "Failed") {
                 continue;
               }
@@ -158,7 +170,7 @@ export class DodoAdapter implements ProviderAdapter {
           // Legacy products use the deprecated license_key_enabled flag and have no entitlement.
           // Their keys carry payment_id/subscription_id, matched the same way.
           if (entitlementIds.length === 0 && product.license_key_enabled) {
-            for await (const k of this.#client.licenseKeys.list({ customer_id: customerId, product_id: productId })) {
+            for await (const k of this.#client.licenseKeys.list({ customer_id: customerId, product_id: productId }, opts)) {
               if (!ours(k)) continue;
               licenseKeys.push({
                 id: k.id,
@@ -173,14 +185,14 @@ export class DodoAdapter implements ProviderAdapter {
       }
 
       const credits = customerId
-        ? (await this.#client.customers.listCreditEntitlements(customerId)).items.map((c) => ({
+        ? (await this.#client.customers.listCreditEntitlements(customerId, opts)).items.map((c) => ({
             name: c.name,
             balance: c.balance,
             unit: c.unit,
           }))
         : [];
       const portalUrl = customerId
-        ? (await this.#client.customers.customerPortal.create(customerId, { send_email: false })).link
+        ? (await this.#client.customers.customerPortal.create(customerId, { send_email: false }, opts)).link
         : null;
 
       return {
@@ -222,11 +234,18 @@ export class DodoAdapter implements ProviderAdapter {
     return mapWebhookEvent(signed["webhook-id"]!, body);
   }
 
-  /** Run an SDK call and turn any failure into a ProviderError that never contains a secret. */
-  async #call<T>(fn: () => Promise<T>): Promise<T> {
+  /**
+   * Run SDK calls and turn any failure into a ProviderError that never contains a secret.
+   * `opts` carries the current tool call's deadline (see core/deadline): every SDK request
+   * inside fn must receive it, so all of them share one time budget. When it fires, the SDK
+   * aborts the request in flight and does not retry.
+   */
+  async #call<T>(fn: (opts: RequestOptions) => Promise<T>): Promise<T> {
+    const deadline = currentDeadline();
     try {
-      return await fn();
+      return await fn(deadline ? { signal: deadline } : {});
     } catch (err) {
+      if (deadline?.aborted) throw new ProviderError(PROVIDER, undefined, "tool call deadline exceeded", DODO_SLOW_MESSAGE);
       if (err instanceof ProviderError) throw err;
       throw this.#toProviderError(err);
     }

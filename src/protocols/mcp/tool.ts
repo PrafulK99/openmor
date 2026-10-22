@@ -1,6 +1,7 @@
 import type { CallToolResult, ToolAnnotations } from "@modelcontextprotocol/server";
 import type { z } from "zod";
 import type { CheckoutDeps } from "@/core/checkout";
+import { TOOL_DEADLINE_MS, withDeadline } from "@/core/deadline";
 import { toolError } from "./results";
 
 /** What a tool handler gets besides its arguments. */
@@ -19,7 +20,10 @@ export interface ToolDefinition<Input extends z.ZodObject = z.ZodObject> {
   inputSchema: Input;
   outputSchema: z.ZodObject;
   annotations: ToolAnnotations;
-  /** Never throws: every failure becomes an error result with a stable code. */
+  /**
+   * Never throws: every failure becomes an error result with a stable code. Runs under a
+   * TOOL_DEADLINE_MS deadline; provider calls past it fail as PROVIDER_ERROR.
+   */
   handler: (input: z.infer<Input>, env: ToolEnv) => Promise<CallToolResult>;
 }
 
@@ -33,7 +37,8 @@ export function defineTool<Input extends z.ZodObject>(
     ...rest,
     handler: async (input, env) => {
       try {
-        return await run(input, env);
+        // One deadline for the whole call, shared by every provider request inside it.
+        return await withDeadline(TOOL_DEADLINE_MS, () => run(input, env));
       } catch (err) {
         return toolError(err);
       }
