@@ -78,6 +78,15 @@ describe("checkout tool", () => {
     expect(text(r)).toMatch(/^QUOTE_EXPIRED: Quote ".+" is expired\. This quote can no longer be used \(quotes last 15 minutes and check out once\); call get_quote again/);
   });
 
+  it("returns QUOTE_USED with a hint when another buyer already checked out the quote", async () => {
+    await checkoutTool.handler({ quote_id: quoteId, buyer_email: "a@x.test" }, env);
+    const r = await checkoutTool.handler({ quote_id: quoteId, buyer_email: "b@x.test" }, env);
+    expect(r.isError).toBe(true);
+    expect(data(r).error.code).toBe("QUOTE_USED");
+    expect(text(r)).toMatch(/^QUOTE_USED: .+ call get_quote again for a fresh quote_id/);
+    expect(text(r)).not.toContain("a@x.test");
+  });
+
   it("returns INVALID_INPUT for a bad email", async () => {
     const r = await checkoutTool.handler({ quote_id: quoteId, buyer_email: "nope" }, env);
     expect(text(r)).toBe("INVALID_INPUT: buyer_email must be a valid email address, e.g. buyer@example.com.");

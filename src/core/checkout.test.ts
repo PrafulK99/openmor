@@ -60,12 +60,20 @@ describe("createCheckout", () => {
     expect(t.adapter.createCheckout).toHaveBeenCalledTimes(1);
   });
 
-  it("refuses a used quote for a different buyer with QUOTE_EXPIRED", async () => {
+  it("refuses a used quote for a different buyer with QUOTE_USED, without a provider call", async () => {
     await createCheckout(deps, { quoteId, buyerEmail: "a@example.com" });
     await expect(createCheckout(deps, { quoteId, buyerEmail: "b@example.com" })).rejects.toMatchObject({
-      code: "QUOTE_EXPIRED",
-      message: expect.stringContaining("already used"),
+      code: "QUOTE_USED",
+      message: expect.stringContaining("already checked out"),
     });
+    expect(t.adapter.createCheckout).toHaveBeenCalledTimes(1);
+    expect(t.db.tables.order).toHaveLength(1);
+  });
+
+  it("does not reveal the other buyer's email in QUOTE_USED", async () => {
+    await createCheckout(deps, { quoteId, buyerEmail: "first@example.com" });
+    const err = await createCheckout(deps, { quoteId, buyerEmail: "b@example.com" }).catch((e: unknown) => e);
+    expect((err as Error).message).not.toContain("first@example.com");
   });
 
   it("refuses an expired quote with QUOTE_EXPIRED and creates nothing", async () => {
@@ -96,15 +104,55 @@ describe("createCheckout", () => {
     });
   });
 
-  it("recovers on retry when the provider failed after the order was created", async () => {
+  it("leaves the quote open and creates no order when the provider fails; a retry succeeds", async () => {
     t.adapter.createCheckout.mockRejectedValueOnce(new ProviderError("Dodo Payments", 503, "down"));
     await expect(createCheckout(deps, { quoteId, buyerEmail: "a@example.com" })).rejects.toMatchObject({
       code: "PROVIDER_ERROR",
     });
-    expect(t.db.tables.order[0]!.checkoutUrl).toBeNull();
+    expect(t.db.tables.order).toHaveLength(0);
+    expect(t.db.tables.quote[0]!.status).toBe("open");
     const retry = await createCheckout(deps, { quoteId, buyerEmail: "a@example.com" });
+    expect(retry.created).toBe(true);
     expect(retry.order.checkoutUrl).toMatch(/^https:\/\//);
     expect(t.db.tables.order).toHaveLength(1);
+    expect(t.db.tables.quote[0]!.status).toBe("used");
+  });
+
+  it("lets a different buyer use the quote after a provider failure", async () => {
+    t.adapter.createCheckout.mockRejectedValueOnce(new ProviderError("Dodo Payments", 503, "down"));
+    await expect(createCheckout(deps, { quoteId, buyerEmail: "a@example.com" })).rejects.toMatchObject({ code: "PROVIDER_ERROR" });
+    const { order } = await createCheckout(deps, { quoteId, buyerEmail: "b@example.com" });
+    expect(t.db.tables.order).toEqual([expect.objectContaining({ id: order.id, buyerEmail: "b@example.com" })]);
+  });
+
+  it("stores the session id and URL with the order in one write, under the id sent to the provider", async () => {
+    const { order } = await createCheckout(deps, { quoteId, buyerEmail: "a@example.com" });
+    const sent = t.adapter.createCheckout.mock.calls[0]![0];
+    expect(sent.metadata?.openmor_order_id).toBe(order.id);
+    expect(t.db.tables.order[0]).toMatchObject({
+      id: order.id,
+      providerCheckoutSessionId: "cks_1",
+      checkoutUrl: "https://test.checkout.dodopayments.com/session/cks_1",
+    });
+  });
+
+  it("refuses with QUOTE_USED if another buyer claims the quote while the provider call runs", async () => {
+    t.adapter.createCheckout.mockImplementationOnce(async () => {
+      t.db.tables.quote[0]!.status = "used";
+      return { sessionId: "cks_9", checkoutUrl: "https://test.checkout.dodopayments.com/session/cks_9" };
+    });
+    await expect(createCheckout(deps, { quoteId, buyerEmail: "a@example.com" })).rejects.toMatchObject({ code: "QUOTE_USED" });
+    expect(t.db.tables.order).toHaveLength(0);
+  });
+
+  it("refuses with QUOTE_EXPIRED if the quote expires while the provider call runs", async () => {
+    t.adapter.createCheckout.mockImplementationOnce(async () => {
+      t.clock.advance(QUOTE_TTL_MS);
+      return { sessionId: "cks_9", checkoutUrl: "https://test.checkout.dodopayments.com/session/cks_9" };
+    });
+    await expect(createCheckout(deps, { quoteId, buyerEmail: "a@example.com" })).rejects.toMatchObject({ code: "QUOTE_EXPIRED" });
+    expect(t.db.tables.order).toHaveLength(0);
+    expect(t.db.tables.quote[0]!.status).toBe("open");
   });
 
   it("rolls back the quote claim if the order insert fails", async () => {

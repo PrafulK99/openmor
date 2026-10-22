@@ -11,6 +11,8 @@ export function ok(structured: Record<string, unknown>, summary: string): CallTo
 /** What to do next, per code. INVALID_INPUT messages already say how to fix the input. */
 export const ERROR_HINTS: Record<ErrorCode, string> = {
   QUOTE_EXPIRED: "This quote can no longer be used (quotes last 15 minutes and check out once); call get_quote again for a fresh quote_id.",
+  QUOTE_USED:
+    "This quote was already checked out with a different buyer_email; call get_quote again for a fresh quote_id, or retry with the original buyer_email to get the existing order.",
   PRICE_CHANGED: "The price moved since the quote; show the buyer the fresh quote and ask again.",
   PRODUCT_UNAVAILABLE: "This product is not for sale to agents; call search_products and pick another product_id.",
   LIMIT_EXCEEDED: "This purchase is over the buyer's spending limit; ask the buyer to raise it or choose a cheaper product.",

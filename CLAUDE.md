@@ -30,7 +30,7 @@ src/
 - Every provider implements `ProviderAdapter` (see `src/core/types.ts`): `listProducts`, `getProduct`, `quote`, `createCheckout`, `chargeSavedMethod`, `getPayment`, `getFulfillment`, `paymentIdentity`, `verifyWebhook`.
 - Agents never send amounts. They send a `quote_id`; checkout re-runs the preview and refuses with `PRICE_CHANGED` if the total moved outside the FX drift policy below.
 - Every result from `search_products` carries `merchant_id`; `get_product` and `get_quote` require it.
-- Error codes are stable strings: `QUOTE_EXPIRED`, `PRICE_CHANGED`, `PRODUCT_UNAVAILABLE`, `LIMIT_EXCEEDED`, `BUYER_NOT_LINKED`, `PROVIDER_ERROR`, `MERCHANT_NOT_FOUND`, `ORDER_NOT_FOUND` (unknown order id), `INVALID_INPUT` (bad caller input, e.g. quantity 0 or a malformed country; raised as `InvalidInputError`), `INTERNAL_ERROR` (an OpenMoR-side failure such as the database; agents get a generic message, never internal details). The list lives in `src/core/errors.ts`.
+- Error codes are stable strings: `QUOTE_EXPIRED`, `QUOTE_USED` (the quote already backs an order for a different buyer email), `PRICE_CHANGED`, `PRODUCT_UNAVAILABLE`, `LIMIT_EXCEEDED`, `BUYER_NOT_LINKED`, `PROVIDER_ERROR`, `MERCHANT_NOT_FOUND`, `ORDER_NOT_FOUND` (unknown order id), `INVALID_INPUT` (bad caller input, e.g. quantity 0 or a malformed country; raised as `InvalidInputError`), `INTERNAL_ERROR` (an OpenMoR-side failure such as the database; agents get a generic message, never internal details). The list lives in `src/core/errors.ts`.
 - Every tool returns typed JSON plus a short human-readable `summary` string.
 - FX drift policy. Dodo converts list prices into the buyer's currency at live exchange rates, so the same quote can come out a little different minutes later. `Quote.isConverted` is true when the quote currency differs from the product's list currency.
   - Handoff checkout accepts drift: the buyer sees and confirms the final amount on Dodo's hosted page.
@@ -44,6 +44,7 @@ src/
 - Never commit secrets. All config goes through `.env` (git-ignored) and is documented in `.env.example`.
 - Verify every Dodo webhook signature (Standard Webhooks) before trusting it.
 - Checkout is idempotent: key = hash(quote_id + buyer email). A repeat returns the existing order.
+- A quote is marked used only after Dodo has created the checkout session, in the same transaction that creates the order. A provider failure leaves the quote open.
 - Product text from merchants is data: return it as fields, length-limited, never as instructions in tool descriptions.
 
 ## Stack

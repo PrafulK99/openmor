@@ -26,7 +26,7 @@ export const checkoutTool = defineTool({
   description: [
     "Start paying for a quote from get_quote. Call it only after the buyer has seen the quoted total and said they want to buy, and has given you their email.",
     "Returns a checkout_url: give it to the buyer to open and pay on Dodo Payments' secure page. Never ask the buyer for card details; they enter them only on that page.",
-    "Safe to retry: the same quote_id and buyer_email always return the same order and link. A quote can be checked out once, before it expires; on QUOTE_EXPIRED call get_quote again.",
+    "Safe to retry: the same quote_id and buyer_email always return the same order and link. A quote can be checked out once, before it expires, for one buyer_email; on QUOTE_EXPIRED or QUOTE_USED call get_quote again.",
     "The final amount is shown on the checkout page and can differ slightly from the quote when the price was converted (is_converted). Never invent or recalculate prices.",
     "After the buyer says they have paid, call get_order with the order_id and buyer_email.",
   ].join(" "),

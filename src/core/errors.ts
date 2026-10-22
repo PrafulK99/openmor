@@ -1,6 +1,8 @@
 /** Stable error codes. Agents and clients match on these strings, so never rename them. */
 export const ERROR_CODES = [
   "QUOTE_EXPIRED",
+  // The quote already backs an order for a different buyer email. A quote checks out once.
+  "QUOTE_USED",
   "PRICE_CHANGED",
   "PRODUCT_UNAVAILABLE",
   "LIMIT_EXCEEDED",
