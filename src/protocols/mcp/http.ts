@@ -27,3 +27,13 @@ export function createOpenMorMcpHandler(deps: CheckoutDeps, version: string): (r
   );
 }
 
+/**
+ * 405 for GET and DELETE. Revision 2026-07-28 removed the GET stream and sessions; the spec
+ * says servers SHOULD answer both with 405, and HTTP requires an Allow header on a 405.
+ */
+export function methodNotAllowed(): Response {
+  return new Response(
+    JSON.stringify({ jsonrpc: "2.0", error: { code: -32000, message: "Method not allowed." }, id: null }),
+    { status: 405, headers: { allow: "POST", "content-type": "application/json" } },
+  );
+}

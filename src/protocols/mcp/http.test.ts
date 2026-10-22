@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { setup } from "@/test/core-fixtures";
-import { createOpenMorMcpHandler } from "./http";
+import { createOpenMorMcpHandler, methodNotAllowed } from "./http";
 import * as route from "@/app/api/mcp/route";
 
 const VERSION = "2026-07-28";
@@ -95,5 +95,19 @@ describe("MCP HTTP endpoint", () => {
 describe("/api/mcp route", () => {
   it("caps the function at 30 seconds", () => {
     expect(route.maxDuration).toBe(30);
+  });
+
+  it.each([
+    ["GET", route.GET],
+    ["DELETE", route.DELETE],
+  ])("answers %s with 405 and Allow: POST", async (_name, fn) => {
+    const res = fn();
+    expect(res.status).toBe(405);
+    expect(res.headers.get("allow")).toBe("POST");
+    expect(await res.json()).toMatchObject({ jsonrpc: "2.0", error: { code: -32000 }, id: null });
+  });
+
+  it("methodNotAllowed matches the route answer", () => {
+    expect(methodNotAllowed().headers.get("allow")).toBe("POST");
   });
 });

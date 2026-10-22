@@ -1,6 +1,6 @@
 // One MCP endpoint (streamable HTTP) for every merchant in the network.
 import { getServerDeps } from "@/app/server-deps";
-import { createOpenMorMcpHandler } from "@/protocols/mcp/http";
+import { createOpenMorMcpHandler, methodNotAllowed } from "@/protocols/mcp/http";
 import pkg from "../../../../package.json";
 
 // No `runtime`/`dynamic` exports: Next 16 with cacheComponents rejects them. Route handlers
@@ -18,8 +18,14 @@ async function getHandler(): Promise<(req: Request) => Promise<Response>> {
   return handler;
 }
 
-async function handle(req: Request): Promise<Response> {
+export async function POST(req: Request): Promise<Response> {
   return (await getHandler())(req);
 }
 
-export { handle as GET, handle as POST };
+export function GET(): Response {
+  return methodNotAllowed();
+}
+
+export function DELETE(): Response {
+  return methodNotAllowed();
+}
