@@ -79,6 +79,13 @@ describe("createBuyerLink", () => {
     expect(logged.join("\n")).not.toContain(token);
   });
 
+  it("gives each link a random, unguessable id", async () => {
+    const a = await createBuyerLink(deps, input());
+    const b = await createBuyerLink(deps, input());
+    expect(a.buyerLinkId).toMatch(/^bl_[A-Za-z0-9_-]{24}$/);
+    expect(a.buyerLinkId).not.toBe(b.buyerLinkId);
+  });
+
   it("uses a fresh random token for every link", async () => {
     await createBuyerLink(deps, input());
     await createBuyerLink(deps, input());

@@ -35,11 +35,11 @@ async function inRequest<T>(fn: () => Promise<T>, headers: Record<string, string
 }
 
 describe("registerOpenMorTools", () => {
-  it("registers all six tools with schemas and annotations", () => {
+  it("registers all eight tools with schemas and annotations", () => {
     const t = setup();
     const { server, tools } = fakeServer();
     registerOpenMorTools(server, { ...t.deps, appUrl: "http://localhost:3000" });
-    expect([...tools.keys()]).toEqual(["search_products", "get_product", "get_quote", "link_buyer", "checkout", "get_order"]);
+    expect([...tools.keys()]).toEqual(["search_products", "get_product", "get_quote", "link_buyer", "get_buyer_link", "revoke_buyer_link", "checkout", "get_order"]);
     for (const def of TOOLS) {
       const { config } = tools.get(def.name)!;
       expect(config).toMatchObject({ description: def.description, annotations: def.annotations });

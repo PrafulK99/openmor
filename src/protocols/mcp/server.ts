@@ -7,13 +7,24 @@ import { portable } from "./portable-schema";
 import { currentRequestInfo } from "./request-info";
 import type { ToolDefinition } from "./tool";
 import { checkoutTool } from "./tools/checkout";
+import { getBuyerLinkTool } from "./tools/get-buyer-link";
 import { getOrderTool } from "./tools/get-order";
 import { getProductTool } from "./tools/get-product";
 import { getQuoteTool } from "./tools/get-quote";
 import { linkBuyerTool } from "./tools/link-buyer";
+import { revokeBuyerLinkTool } from "./tools/revoke-buyer-link";
 import { searchProductsTool } from "./tools/search-products";
 
-export const TOOLS: ToolDefinition[] = [searchProductsTool, getProductTool, getQuoteTool, linkBuyerTool, checkoutTool, getOrderTool] as ToolDefinition[];
+export const TOOLS: ToolDefinition[] = [
+  searchProductsTool,
+  getProductTool,
+  getQuoteTool,
+  linkBuyerTool,
+  getBuyerLinkTool,
+  revokeBuyerLinkTool,
+  checkoutTool,
+  getOrderTool,
+] as ToolDefinition[];
 
 export const SERVER_INSTRUCTIONS = [
   "OpenMoR lets you find and buy digital products from merchants that sell through a merchant of record.",

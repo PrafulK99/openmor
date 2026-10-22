@@ -26,6 +26,7 @@
     "merchant:sync": "tsx scripts/merchant-sync.ts",
     "merchant:sellable": "tsx scripts/merchant-sellable.ts",
     "merchant:webhook": "tsx scripts/merchant-webhook.ts",
+    "merchant:cards": "tsx scripts/merchant-cards.ts",
     "try:core": "tsx scripts/try-core.ts"
   },
   "dependencies": {

@@ -1,12 +1,14 @@
 // Buyer links: a buyer's email-approved permission for an agent to charge their saved card at
 // one merchant, within a monthly cap. Tokens are random and stored only as a SHA-256 hash.
 import { createHash, randomBytes } from "node:crypto";
+import type { BuyerLink } from "@/generated/prisma/client";
 import { buildApprovalEmail } from "@/core/approval-email";
 import { normalizeEmail, type CheckoutDeps } from "@/core/checkout";
 import { nowFrom } from "@/core/deps";
 import { DeadlineExceededError, raceDeadline } from "@/core/deadline";
 import { EmailSendError, InvalidInputError, OpenMorError, ProviderError } from "@/core/errors";
 import { formatMoney } from "@/core/money";
+import { monthlyAllowance } from "@/core/spend";
 
 /** The emailed approval link works for this long. */
 export const APPROVAL_TTL_MS = 30 * 60 * 1000;
@@ -161,6 +163,8 @@ export async function createBuyerLink(deps: CheckoutDeps, input: CreateBuyerLink
   const approvalExpiresAt = new Date(now.getTime() + APPROVAL_TTL_MS);
   const link = await deps.db.buyerLink.create({
     data: {
+      // Random, not a sequential cuid: with the buyer's email, this id is what authorizes charges.
+      id: `bl_${randomBytes(18).toString("base64url")}`,
       merchantId: merchant.id,
       agentSessionId: input.agentSessionId ?? null,
       buyerEmail: email,
@@ -321,4 +325,92 @@ export async function decideApproval(deps: CheckoutDeps, token: string, decision
   // Lost a race: someone decided it meanwhile, or it expired while we waited for the provider.
   const latest = await deps.db.buyerLink.findUnique({ where: { id: link.id }, select: { status: true } });
   return { kind: latest?.status === "pending_approval" ? "expired" : "already_used" };
+}
+
+// ---------------------------------------------------------------------------------------------
+// Status and revoking. Both need the buyer's email to match the link's, so an agent that only
+// has a link id (or guesses one) learns nothing and changes nothing.
+// ---------------------------------------------------------------------------------------------
+
+/** The status an agent sees. "expired" covers both an unapproved link whose email lapsed and an approved link past its end date. */
+export type LinkStatus = "pending_approval" | "active" | "revoked" | "expired";
+
+export interface BuyerLinkStatusView {
+  buyerLinkId: string;
+  merchantId: string;
+  merchantName: string;
+  status: LinkStatus;
+  currency: string;
+  monthlyCap: number;
+  perOrderCap: number | null;
+  productIds: string[] | null;
+  /** Spent this calendar month (UTC), in minor units of `currency`. */
+  spentThisMonth: number;
+  /** Left of the monthly cap. Zero unless the link is active. */
+  remainingThisMonth: number;
+  /** When the monthly cap starts again: the start of next month, UTC. */
+  monthResetsAt: Date;
+  /** When the permission ends. */
+  expiresAt: Date;
+  /** While waiting for approval: when the emailed link stops working. Otherwise null. */
+  approvalExpiresAt: Date | null;
+}
+
+function effectiveStatus(link: BuyerLink, now: Date): LinkStatus {
+  const t = now.getTime();
+  if (link.status === "pending_approval") return t >= link.approvalExpiresAt.getTime() || t >= link.expiresAt.getTime() ? "expired" : "pending_approval";
+  if (link.status === "active") return t >= link.expiresAt.getTime() ? "expired" : "active";
+  return link.status;
+}
+
+async function findOwnedLink(deps: CheckoutDeps, buyerLinkId: string, buyerEmail: string): Promise<BuyerLink> {
+  const link = await deps.db.buyerLink.findUnique({ where: { id: buyerLinkId.trim() } });
+  // One answer for "no such link" and "someone else's link".
+  if (!link || link.buyerEmail !== normalizeEmail(buyerEmail)) {
+    throw new OpenMorError("BUYER_NOT_LINKED", "No buyer link with this id for that email. Use the buyer_link_id from link_buyer and the buyer's email.");
+  }
+  return link;
+}
+
+async function statusView(deps: CheckoutDeps, link: BuyerLink): Promise<BuyerLinkStatusView> {
+  const now = nowFrom(deps);
+  const status = effectiveStatus(link, now);
+  const [merchant, allowance] = await Promise.all([
+    deps.db.merchant.findUnique({ where: { id: link.merchantId }, select: { name: true } }),
+    monthlyAllowance(deps.db, link, now),
+  ]);
+  return {
+    buyerLinkId: link.id,
+    merchantId: link.merchantId,
+    merchantName: merchant?.name ?? "this merchant",
+    status,
+    currency: link.currency,
+    monthlyCap: link.monthlyCapAmount,
+    perOrderCap: link.perOrderCapAmount,
+    productIds: link.productScope.length ? link.productScope : null,
+    spentThisMonth: allowance.spent,
+    remainingThisMonth: status === "active" ? allowance.remaining : 0,
+    monthResetsAt: allowance.resetsAt,
+    expiresAt: link.expiresAt,
+    approvalExpiresAt: status === "pending_approval" ? link.approvalExpiresAt : null,
+  };
+}
+
+/** A link's status, caps and this month's spend. Reads only. */
+export async function getBuyerLinkStatus(deps: CheckoutDeps, input: { buyerLinkId: string; buyerEmail: string }): Promise<BuyerLinkStatusView> {
+  return statusView(deps, await findOwnedLink(deps, input.buyerLinkId, input.buyerEmail));
+}
+
+/**
+ * Revoke a link (pending or active) so nothing more can be charged with it. Orders already paid
+ * are unaffected. Revoking again is harmless. A saved-method checkout that already reserved its
+ * spend before this call may still complete: revoking stops new charges, not ones in flight.
+ */
+export async function revokeBuyerLink(deps: CheckoutDeps, input: { buyerLinkId: string; buyerEmail: string }): Promise<BuyerLinkStatusView> {
+  const link = await findOwnedLink(deps, input.buyerLinkId, input.buyerEmail);
+  await deps.db.buyerLink.updateMany({
+    where: { id: link.id, status: { in: ["pending_approval", "active"] } },
+    data: { status: "revoked", revokedAt: nowFrom(deps) },
+  });
+  return statusView(deps, await findOwnedLink(deps, input.buyerLinkId, input.buyerEmail));
 }
