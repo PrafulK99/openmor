@@ -11,6 +11,8 @@ import type {
   ProviderAdapter,
   ProviderQuote,
   QuoteInput,
+  SavedMethodChargeInput,
+  SavedPaymentMethod,
   WebhookEvent,
   WebhookInput,
 } from "@/core/types";
@@ -99,9 +101,14 @@ export class FakeAdapter implements ProviderAdapter {
     return JSON.parse(rawBody) as WebhookEvent;
   });
 
-  chargeSavedMethod = async (): Promise<never> => {
-    throw new NotImplementedError("FakeAdapter.chargeSavedMethod");
-  };
+  /** Succeeds by default with the preview total, echoing the metadata like Dodo does. */
+  chargeSavedMethod = vi.fn<(input: SavedMethodChargeInput) => Promise<Payment>>(async (input) =>
+    payment({ paymentId: "pay_saved_1", status: "succeeded", total: 954, tax: 152, metadata: input.metadata ?? {} }),
+  );
+  findSavedPaymentMethod = vi.fn<(email: string) => Promise<SavedPaymentMethod | null>>(async () => ({
+    customerId: "cus_1",
+    paymentMethodId: "pm_1",
+  }));
   paymentIdentity = (): never => {
     throw new NotImplementedError("FakeAdapter.paymentIdentity");
   };

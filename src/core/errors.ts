@@ -53,6 +53,22 @@ export class InvalidInputError extends OpenMorError {
   }
 }
 
+/**
+ * The provider could not charge a saved payment method without the buyer there: it needs the
+ * buyer to confirm (e.g. card authentication) or refused the automatic charge. Not an agent-facing
+ * error code: checkout catches it and falls back to a hosted checkout link.
+ */
+export class BuyerActionRequiredError extends Error {
+  /** Short, non-secret reason, for tests and debugging. */
+  readonly reason: string;
+
+  constructor(reason: string) {
+    super(`The buyer must be present to pay: ${reason}`);
+    this.name = "BuyerActionRequiredError";
+    this.reason = reason;
+  }
+}
+
 /** A webhook failed signature verification or could not be read. Answer HTTP 401; never log its body. */
 export class WebhookVerificationError extends Error {
   constructor(reason: string) {

@@ -1,6 +1,7 @@
 import { createHmac } from "node:crypto";
+import { APIConnectionTimeoutError, APIError } from "dodopayments";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { WebhookVerificationError } from "@/core/errors";
+import { BuyerActionRequiredError, ProviderError, WebhookVerificationError } from "@/core/errors";
 import { DodoAdapter } from "./adapter";
 
 // Mocked SDK for checkout, payments, fulfillment. Webhooks use the real SDK verifier
@@ -14,6 +15,8 @@ const sdk = vi.hoisted(() => ({
   listGrants: vi.fn(),
   listCredits: vi.fn(),
   createPortal: vi.fn(),
+  listCustomers: vi.fn(),
+  retrievePaymentMethods: vi.fn(),
 }));
 
 vi.mock("dodopayments", async (importOriginal) => {
@@ -27,7 +30,12 @@ vi.mock("dodopayments", async (importOriginal) => {
     licenseKeys = { list: sdk.listLicenseKeys };
     products = { retrieve: sdk.retrieveProduct };
     entitlements = { grants: { list: sdk.listGrants } };
-    customers = { listCreditEntitlements: sdk.listCredits, customerPortal: { create: sdk.createPortal } };
+    customers = {
+      list: sdk.listCustomers,
+      retrievePaymentMethods: sdk.retrievePaymentMethods,
+      listCreditEntitlements: sdk.listCredits,
+      customerPortal: { create: sdk.createPortal },
+    };
     webhooks = realWebhooks;
   }
   return { ...real, default: FakeDodo, DodoPayments: FakeDodo };
@@ -274,5 +282,121 @@ describe("verifyWebhook", () => {
     const b = JSON.stringify({ type: "subscription.renewed", timestamp: "2026-10-21T19:40:00Z", data: { subscription_id: "s" } });
     const e = await adapter().verifyWebhook({ headers: sign(b, "msg_2"), rawBody: b });
     expect(e).toEqual({ id: "msg_2", type: "subscription.renewed", occurredAt: "2026-10-21T19:40:00Z" });
+  });
+});
+
+describe("chargeSavedMethod", () => {
+  const input = {
+    quote: { items: [{ productId: "pdt_life", quantity: 1 }], country: "de", discountCodes: ["SAVE10"] },
+    customer: { email: "b@x.test" },
+    returnUrl: "http://localhost:3000/orders/ord_1",
+    metadata: { openmor_order_id: "ord_1" },
+    customerId: "cus_1",
+    paymentMethodId: "pm_1",
+  };
+
+  it("confirms a session for the existing customer and method, then reads the payment's status", async () => {
+    sdk.createSession.mockResolvedValue({ session_id: "cks_9", checkout_url: null, payment_id: "pay_1" });
+    sdk.retrievePayment.mockResolvedValue(dodoPayment);
+    const p = await adapter().chargeSavedMethod(input);
+    expect(sdk.createSession).toHaveBeenCalledWith(
+      {
+        product_cart: [{ product_id: "pdt_life", quantity: 1 }],
+        customer: { customer_id: "cus_1" },
+        payment_method_id: "pm_1",
+        confirm: true,
+        billing_address: { country: "DE" },
+        discount_codes: ["SAVE10"],
+        return_url: "http://localhost:3000/orders/ord_1",
+        metadata: { openmor_order_id: "ord_1" },
+      },
+      {},
+    );
+    expect(sdk.retrievePayment).toHaveBeenCalledWith("pay_1", {});
+    expect(p).toMatchObject({ paymentId: "pay_1", status: "succeeded", total: 5195, tax: 830, metadata: { openmor_order_id: "ord_1" } });
+  });
+
+  it("returns a payment that is still processing as processing", async () => {
+    sdk.createSession.mockResolvedValue({ session_id: "cks_9", payment_id: "pay_1" });
+    sdk.retrievePayment.mockResolvedValue({ ...dodoPayment, status: "processing" });
+    expect((await adapter().chargeSavedMethod(input)).status).toBe("processing");
+  });
+
+  it.each(["requires_customer_action", "requires_payment_method", "requires_confirmation", "failed", "cancelled"])(
+    "needs the buyer when the payment is %s",
+    async (status) => {
+      sdk.createSession.mockResolvedValue({ session_id: "cks_9", payment_id: "pay_1" });
+      sdk.retrievePayment.mockResolvedValue({ ...dodoPayment, status });
+      await expect(adapter().chargeSavedMethod(input)).rejects.toBeInstanceOf(BuyerActionRequiredError);
+    },
+  );
+
+  it("needs the buyer when Dodo creates no payment", async () => {
+    sdk.createSession.mockResolvedValue({ session_id: "cks_9", checkout_url: "https://x", payment_id: null });
+    await expect(adapter().chargeSavedMethod(input)).rejects.toBeInstanceOf(BuyerActionRequiredError);
+  });
+
+  it("treats a 4xx refusal as needing the buyer: no payment exists", async () => {
+    sdk.createSession.mockRejectedValue(APIError.generate(422, { message: "3DS required" }, undefined, new Headers()));
+    const err = await adapter().chargeSavedMethod(input).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(BuyerActionRequiredError);
+    expect((err as BuyerActionRequiredError).reason).toBe("Dodo refused the charge (HTTP 422)");
+    expect(sdk.retrievePayment).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["a 503", APIError.generate(503, { message: "down" }, undefined, new Headers())],
+    ["a timeout", new APIConnectionTimeoutError()],
+  ])("rethrows %s as PROVIDER_ERROR, never as needing the buyer: a payment may exist", async (_name, failure) => {
+    sdk.createSession.mockRejectedValue(failure);
+    const err = await adapter().chargeSavedMethod(input).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(ProviderError);
+    expect(err).not.toBeInstanceOf(BuyerActionRequiredError);
+  });
+});
+
+describe("findSavedPaymentMethod", () => {
+  const card = (id: string, extra: Record<string, unknown> = {}) => ({ payment_method: "card", payment_method_id: id, ...extra });
+
+  it("looks the customer up by lowercase email and returns their saved card", async () => {
+    sdk.listCustomers.mockReturnValue(pages([{ customer_id: "cus_1", email: "Buyer@Example.com" }]));
+    sdk.retrievePaymentMethods.mockResolvedValue({ items: [card("pm_1")] });
+    expect(await adapter().findSavedPaymentMethod("  Buyer@Example.com ")).toEqual({ customerId: "cus_1", paymentMethodId: "pm_1" });
+    expect(sdk.listCustomers).toHaveBeenCalledWith({ email: "buyer@example.com" }, {});
+    expect(sdk.retrievePaymentMethods).toHaveBeenCalledWith("cus_1", {});
+  });
+
+  it("ignores customers whose email only partly matches", async () => {
+    sdk.listCustomers.mockReturnValue(pages([{ customer_id: "cus_other", email: "xbuyer@example.com.au" }]));
+    expect(await adapter().findSavedPaymentMethod("buyer@example.com")).toBeNull();
+    expect(sdk.retrievePaymentMethods).not.toHaveBeenCalled();
+  });
+
+  it("picks the most recently used card and skips non-cards and cards unusable for repeat charges", async () => {
+    sdk.listCustomers.mockReturnValue(pages([{ customer_id: "cus_1", email: "buyer@example.com" }]));
+    sdk.retrievePaymentMethods.mockResolvedValue({
+      items: [
+        card("pm_old", { last_used_at: "2026-01-01T00:00:00Z" }),
+        card("pm_new", { last_used_at: "2026-09-01T00:00:00Z" }),
+        card("pm_blocked", { last_used_at: "2026-10-01T00:00:00Z", recurring_enabled: false }),
+        { payment_method: "upi", payment_method_id: "pm_upi", last_used_at: "2026-10-20T00:00:00Z" },
+      ],
+    });
+    expect((await adapter().findSavedPaymentMethod("buyer@example.com"))?.paymentMethodId).toBe("pm_new");
+  });
+
+  it("returns null with no customer, or a customer with no usable card", async () => {
+    sdk.listCustomers.mockReturnValueOnce(pages([]));
+    expect(await adapter().findSavedPaymentMethod("buyer@example.com")).toBeNull();
+    sdk.listCustomers.mockReturnValueOnce(pages([{ customer_id: "cus_1", email: "buyer@example.com" }]));
+    sdk.retrievePaymentMethods.mockResolvedValue({ items: [] });
+    expect(await adapter().findSavedPaymentMethod("buyer@example.com")).toBeNull();
+  });
+
+  it("wraps Dodo failures as PROVIDER_ERROR", async () => {
+    sdk.listCustomers.mockImplementation(() => {
+      throw APIError.generate(500, { message: "boom" }, undefined, new Headers());
+    });
+    await expect(adapter().findSavedPaymentMethod("buyer@example.com")).rejects.toMatchObject({ code: "PROVIDER_ERROR", status: 500 });
   });
 });

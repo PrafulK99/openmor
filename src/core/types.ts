@@ -92,6 +92,12 @@ export interface SavedMethodChargeInput extends CheckoutInput {
   paymentMethodId: string;
 }
 
+/** A card the buyer saved with the provider, found by their email. Provider ids only: no card data. */
+export interface SavedPaymentMethod {
+  customerId: string;
+  paymentMethodId: string;
+}
+
 export type PaymentStatus = "processing" | "succeeded" | "failed" | "cancelled";
 
 export interface Payment {
@@ -157,7 +163,13 @@ export interface ProviderAdapter {
   getProduct(productId: string): Promise<Product>;
   quote(input: QuoteInput): Promise<ProviderQuote>;
   createCheckout(input: CheckoutInput): Promise<CheckoutSession>;
+  /**
+   * Charge a saved method now, without the buyer. Resolves with the payment ("succeeded" or
+   * still "processing"). Throws BuyerActionRequiredError when the provider needs the buyer present.
+   */
   chargeSavedMethod(input: SavedMethodChargeInput): Promise<Payment>;
+  /** The buyer's best saved card for off-session charges, or null if they have none. */
+  findSavedPaymentMethod(email: string): Promise<SavedPaymentMethod | null>;
   getPayment(paymentId: string): Promise<Payment>;
   getFulfillment(paymentId: string): Promise<Fulfillment>;
   paymentIdentity(): PaymentIdentity;

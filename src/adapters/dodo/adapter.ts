@@ -2,7 +2,7 @@
 import DodoPayments, { APIError } from "dodopayments";
 import type { CountryCode } from "dodopayments/resources/misc";
 import { currentDeadline } from "@/core/deadline";
-import { NotImplementedError, ProviderError, WebhookVerificationError } from "@/core/errors";
+import { BuyerActionRequiredError, NotImplementedError, ProviderError, WebhookVerificationError } from "@/core/errors";
 import type {
   CheckoutInput,
   CheckoutSession,
@@ -15,6 +15,8 @@ import type {
   ProviderEnvironment,
   ProviderQuote,
   QuoteInput,
+  SavedMethodChargeInput,
+  SavedPaymentMethod,
   WebhookEvent,
   WebhookInput,
 } from "@/core/types";
@@ -32,6 +34,14 @@ export interface DodoAdapterOptions {
 type RequestOptions = NonNullable<Parameters<DodoPayments["products"]["retrieve"]>[1]>;
 
 const PROVIDER = "Dodo Payments";
+/** Most customers with one email we look through when searching for a saved card. */
+const MAX_CUSTOMERS_PER_EMAIL = 5;
+/**
+ * Payment statuses after a confirmed saved-method charge that mean the buyer has to do
+ * something (authenticate, pick another card). A failed or cancelled payment counts too.
+ * UNVERIFIED against live Dodo behaviour: confirm in test mode (see docs/buyer-links.md).
+ */
+const BUYER_NEEDED_STATUSES = new Set(["requires_customer_action", "requires_payment_method", "requires_confirmation"]);
 /** What the agent sees when a tool call's deadline cuts Dodo off. */
 export const DODO_SLOW_MESSAGE = "Dodo is slow right now, try again in a minute";
 const WEBHOOK_HEADERS = ["webhook-id", "webhook-timestamp", "webhook-signature"] as const;
@@ -108,8 +118,66 @@ export class DodoAdapter implements ProviderAdapter {
     return { sessionId: session.session_id, checkoutUrl: session.checkout_url };
   }
 
-  async chargeSavedMethod(): Promise<Payment> {
-    throw new NotImplementedError("DodoAdapter.chargeSavedMethod");
+  /**
+   * Charge a card the buyer saved earlier, without them present: a confirmed checkout session
+   * for an existing customer and payment method. No card data touches OpenMoR.
+   * Throws BuyerActionRequiredError when Dodo cannot complete it without the buyer.
+   */
+  async chargeSavedMethod(input: SavedMethodChargeInput): Promise<Payment> {
+    return this.#call(async (opts) => {
+      let session;
+      try {
+        session = await this.#client.checkoutSessions.create(
+          {
+            product_cart: input.quote.items.map((i) => ({ product_id: i.productId, quantity: i.quantity })),
+            customer: { customer_id: input.customerId },
+            payment_method_id: input.paymentMethodId,
+            confirm: true,
+            billing_address: billingAddress(input.quote),
+            ...(input.quote.discountCodes?.length ? { discount_codes: input.quote.discountCodes } : {}),
+            return_url: input.returnUrl,
+            ...(input.metadata ? { metadata: input.metadata } : {}),
+          },
+          opts,
+        );
+      } catch (err) {
+        // A 4xx means Dodo refused the request, so no payment exists: the buyer can pay on the
+        // hosted page instead. Anything else (timeout, 5xx) leaves the outcome unknown and is
+        // rethrown, because a payment may exist.
+        if (err instanceof APIError && err.status !== undefined && err.status >= 400 && err.status < 500) {
+          throw new BuyerActionRequiredError(`Dodo refused the charge (HTTP ${err.status})`);
+        }
+        throw err;
+      }
+      if (!session.payment_id) throw new BuyerActionRequiredError("Dodo created no payment for the saved method");
+      const payment = await this.#client.payments.retrieve(session.payment_id, opts);
+      const mapped = mapPayment(payment);
+      const needsBuyer = (payment.status && BUYER_NEEDED_STATUSES.has(payment.status)) || mapped.status === "failed" || mapped.status === "cancelled";
+      if (needsBuyer) throw new BuyerActionRequiredError(`payment status ${payment.status ?? mapped.status}`);
+      return mapped;
+    });
+  }
+
+  /**
+   * The buyer's saved card, found through their Dodo customer record (matched on exact email).
+   * Prefers cards that are not marked unusable for repeat charges, most recently used first.
+   */
+  async findSavedPaymentMethod(email: string): Promise<SavedPaymentMethod | null> {
+    const wanted = email.trim().toLowerCase();
+    return this.#call(async (opts) => {
+      let checked = 0;
+      // The email filter may match loosely, so compare exactly.
+      for await (const customer of this.#client.customers.list({ email: wanted }, opts)) {
+        if (customer.email.trim().toLowerCase() !== wanted) continue;
+        if (++checked > MAX_CUSTOMERS_PER_EMAIL) break;
+        const { items } = await this.#client.customers.retrievePaymentMethods(customer.customer_id, opts);
+        const best = items
+          .filter((m) => m.payment_method === "card" && m.recurring_enabled !== false)
+          .sort((a, b) => (Date.parse(b.last_used_at ?? "") || 0) - (Date.parse(a.last_used_at ?? "") || 0))[0];
+        if (best) return { customerId: customer.customer_id, paymentMethodId: best.payment_method_id };
+      }
+      return null;
+    });
   }
 
   async getPayment(paymentId: string): Promise<Payment> {
@@ -246,7 +314,7 @@ export class DodoAdapter implements ProviderAdapter {
       return await fn(deadline ? { signal: deadline } : {});
     } catch (err) {
       if (deadline?.aborted) throw new ProviderError(PROVIDER, undefined, "tool call deadline exceeded", DODO_SLOW_MESSAGE);
-      if (err instanceof ProviderError) throw err;
+      if (err instanceof ProviderError || err instanceof BuyerActionRequiredError) throw err;
       throw this.#toProviderError(err);
     }
   }
