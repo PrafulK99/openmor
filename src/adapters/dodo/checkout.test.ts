@@ -10,6 +10,8 @@ const sdk = vi.hoisted(() => ({
   retrievePayment: vi.fn(),
   retrieveSubscription: vi.fn(),
   listLicenseKeys: vi.fn(),
+  retrieveProduct: vi.fn(),
+  listGrants: vi.fn(),
   listCredits: vi.fn(),
   createPortal: vi.fn(),
 }));
@@ -23,6 +25,8 @@ vi.mock("dodopayments", async (importOriginal) => {
     payments = { retrieve: sdk.retrievePayment };
     subscriptions = { retrieve: sdk.retrieveSubscription };
     licenseKeys = { list: sdk.listLicenseKeys };
+    products = { retrieve: sdk.retrieveProduct };
+    entitlements = { grants: { list: sdk.listGrants } };
     customers = { listCreditEntitlements: sdk.listCredits, customerPortal: { create: sdk.createPortal } };
     webhooks = realWebhooks;
   }
@@ -106,19 +110,52 @@ describe("getPayment / getFulfillment", () => {
     });
   });
 
-  it("returns only this payment's licence keys, plus credits and a portal link, without emailing the buyer", async () => {
-    sdk.retrievePayment.mockResolvedValue(dodoPayment);
-    sdk.listLicenseKeys.mockReturnValue(
-      pages([
-        { id: "lic_1", key: "KEY-OURS", status: "active", payment_id: "pay_1", activations_limit: 3, expires_at: null },
-        { id: "lic_2", key: "KEY-OTHER", status: "active", payment_id: "pay_old" },
-      ]),
-    );
+  // A product whose licence keys come from a license_key entitlement (the current Dodo model).
+  const withKeyEntitlement = {
+    product_id: "pdt_life",
+    license_key_enabled: false,
+    entitlements: [
+      { id: "ent_key", integration_type: "license_key", name: "Key", integration_config: {} },
+      { id: "ent_gh", integration_type: "github", name: "Repo", integration_config: {} },
+    ],
+  };
+  const grant = (over: Record<string, unknown>) => ({
+    id: "entg_1",
+    integration_type: "license_key",
+    status: "Delivered",
+    customer_id: "cus_1",
+    payment_id: "pay_1",
+    subscription_id: null,
+    license_key: { id: "lic_1", key: "KEY-OURS", status: "active", activations_used: 0, activations_limit: 3, expires_at: null },
+    ...over,
+  });
+
+  function stubRest() {
     sdk.listCredits.mockResolvedValue({ items: [{ name: "Storage", balance: "100", unit: "GB" }] });
     sdk.createPortal.mockResolvedValue({ link: "https://portal/abc" });
+  }
+
+  it("reads keys from entitlement grants, matched to this payment, plus credits and a portal link", async () => {
+    sdk.retrievePayment.mockResolvedValue(dodoPayment);
+    sdk.retrieveProduct.mockResolvedValue(withKeyEntitlement);
+    sdk.listGrants.mockReturnValue(
+      pages([
+        grant({}),
+        // Same customer, earlier purchase of the same product: not this order.
+        grant({ id: "entg_old", payment_id: "pay_old", license_key: { id: "lic_old", key: "KEY-OLD", status: "active" } }),
+        // This payment, but revoked or failed: never handed out.
+        grant({ id: "entg_rev", status: "Revoked", license_key: { id: "lic_rev", key: "KEY-REVOKED", status: "disabled" } }),
+        grant({ id: "entg_fail", status: "Failed", license_key: null }),
+      ]),
+    );
+    stubRest();
 
     const f = await adapter().getFulfillment("pay_1");
-    expect(sdk.listLicenseKeys).toHaveBeenCalledWith({ customer_id: "cus_1", product_id: "pdt_life" });
+    expect(sdk.retrieveProduct).toHaveBeenCalledWith("pdt_life");
+    // Only the license_key entitlement is queried, filtered to this customer.
+    expect(sdk.listGrants).toHaveBeenCalledTimes(1);
+    expect(sdk.listGrants).toHaveBeenCalledWith("ent_key", { customer_id: "cus_1" });
+    expect(sdk.listLicenseKeys).not.toHaveBeenCalled();
     expect(sdk.createPortal).toHaveBeenCalledWith("cus_1", { send_email: false });
     expect(f).toEqual({
       paymentId: "pay_1",
@@ -129,7 +166,16 @@ describe("getPayment / getFulfillment", () => {
     });
   });
 
-  it("includes the subscription and its keys", async () => {
+  it("reports a manually fulfilled grant as pending, with no key", async () => {
+    sdk.retrievePayment.mockResolvedValue(dodoPayment);
+    sdk.retrieveProduct.mockResolvedValue(withKeyEntitlement);
+    sdk.listGrants.mockReturnValue(pages([grant({ id: "entg_p", status: "Pending", license_key: null })]));
+    stubRest();
+    const f = await adapter().getFulfillment("pay_1");
+    expect(f.licenseKeys).toEqual([{ id: "entg_p", key: null, status: "pending", activationsLimit: null, expiresAt: null }]);
+  });
+
+  it("matches subscription grants by subscription id", async () => {
     sdk.retrievePayment.mockResolvedValue({ ...dodoPayment, subscription_id: "sub_1", product_cart: null });
     sdk.retrieveSubscription.mockResolvedValue({
       subscription_id: "sub_1",
@@ -137,15 +183,44 @@ describe("getPayment / getFulfillment", () => {
       next_billing_date: "2026-11-21T00:00:00Z",
       product_id: "pdt_pro",
     });
-    sdk.listLicenseKeys.mockReturnValue(
-      pages([{ id: "lic_3", key: "K3", status: "active", payment_id: null, subscription_id: "sub_1" }]),
+    sdk.retrieveProduct.mockResolvedValue({ ...withKeyEntitlement, product_id: "pdt_pro" });
+    sdk.listGrants.mockReturnValue(
+      pages([
+        grant({ payment_id: null, subscription_id: "sub_1", license_key: { id: "lic_3", key: "K3", status: "active" } }),
+        grant({ payment_id: null, subscription_id: "sub_other", license_key: { id: "lic_4", key: "K4", status: "active" } }),
+      ]),
     );
-    sdk.listCredits.mockResolvedValue({ items: [] });
-    sdk.createPortal.mockResolvedValue({ link: "https://portal/x" });
+    stubRest();
     const f = await adapter().getFulfillment("pay_1");
-    expect(sdk.listLicenseKeys).toHaveBeenCalledWith({ customer_id: "cus_1", product_id: "pdt_pro" });
+    expect(sdk.retrieveProduct).toHaveBeenCalledWith("pdt_pro");
     expect(f.subscription).toEqual({ id: "sub_1", status: "active", nextBillingDate: "2026-11-21T00:00:00Z" });
     expect(f.licenseKeys.map((k) => k.key)).toEqual(["K3"]);
+  });
+
+  it("falls back to the deprecated licence-key list only for legacy products without an entitlement", async () => {
+    sdk.retrievePayment.mockResolvedValue(dodoPayment);
+    sdk.retrieveProduct.mockResolvedValue({ product_id: "pdt_life", license_key_enabled: true, entitlements: [] });
+    sdk.listLicenseKeys.mockReturnValue(
+      pages([
+        { id: "lic_1", key: "KEY-LEGACY", status: "active", payment_id: "pay_1", activations_limit: 1, expires_at: null },
+        { id: "lic_2", key: "KEY-OTHER", status: "active", payment_id: "pay_old" },
+      ]),
+    );
+    stubRest();
+    const f = await adapter().getFulfillment("pay_1");
+    expect(sdk.listGrants).not.toHaveBeenCalled();
+    expect(sdk.listLicenseKeys).toHaveBeenCalledWith({ customer_id: "cus_1", product_id: "pdt_life" });
+    expect(f.licenseKeys.map((k) => k.key)).toEqual(["KEY-LEGACY"]);
+  });
+
+  it("returns no keys for a product without licence keys", async () => {
+    sdk.retrievePayment.mockResolvedValue(dodoPayment);
+    sdk.retrieveProduct.mockResolvedValue({ product_id: "pdt_life", license_key_enabled: false, entitlements: [] });
+    stubRest();
+    const f = await adapter().getFulfillment("pay_1");
+    expect(f.licenseKeys).toEqual([]);
+    expect(sdk.listGrants).not.toHaveBeenCalled();
+    expect(sdk.listLicenseKeys).not.toHaveBeenCalled();
   });
 });
 

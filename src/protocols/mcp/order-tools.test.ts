@@ -121,6 +121,21 @@ describe("get_order tool", () => {
     expect(getOrderTool.outputSchema.safeParse(data(r)).success).toBe(true);
   });
 
+  it("reports a licence key that is still being issued", async () => {
+    await pay(orderId);
+    t.adapter.getFulfillment.mockResolvedValueOnce({
+      paymentId: "pay_1",
+      licenseKeys: [{ id: "entg_p", key: null, status: "pending", activationsLimit: null, expiresAt: null }],
+      subscription: null,
+      credits: [],
+      portalUrl: null,
+    });
+    const r = await getOrderTool.handler({ order_id: orderId, buyer_email: "b@x.test" }, env);
+    expect(data(r).fulfillment.license_keys).toEqual([{ key: null, status: "pending", activations_limit: null, expires_at: null }]);
+    expect(text(r)).toMatch(/1 licence key still being issued \(call get_order again later\)/);
+    expect(getOrderTool.outputSchema.safeParse(data(r)).success).toBe(true);
+  });
+
   it("withholds the licence key without the buyer's email, and refuses a wrong email", async () => {
     await pay(orderId);
     const r = await getOrderTool.handler({ order_id: orderId }, env);

@@ -17,7 +17,10 @@ const inputSchema = z.object({
 const fulfillmentSchema = z.object({
   license_keys: z.array(
     z.object({
-      key: z.string().describe("Give this to the buyer. Do not store or repeat it elsewhere."),
+      key: z
+        .string()
+        .nullable()
+        .describe('Give this to the buyer. Do not store or repeat it elsewhere. Null while status is "pending".'),
       status: z.string(),
       activations_limit: z.number().int().nullable(),
       expires_at: z.string().nullable(),
@@ -97,8 +100,11 @@ export const getOrderTool = defineTool({
       const amount = charged ? charged.formatted : quoted.formatted;
       const drift = charged && charged.amount_minor !== quoted.amount_minor ? ` (quoted ${quoted.formatted})` : "";
       if (fulfillment) {
+        const issued = fulfillment.license_keys.filter((k) => k.key !== null).length;
+        const pending = fulfillment.license_keys.length - issued;
         const parts = [
-          fulfillment.license_keys.length ? `${fulfillment.license_keys.length} licence key${fulfillment.license_keys.length === 1 ? "" : "s"}` : null,
+          issued ? `${issued} licence key${issued === 1 ? "" : "s"}` : null,
+          pending ? `${pending} licence key${pending === 1 ? "" : "s"} still being issued (call get_order again later)` : null,
           fulfillment.subscription ? `subscription ${fulfillment.subscription.status}` : null,
           fulfillment.portal_url ? "a customer portal link" : null,
         ].filter(Boolean);

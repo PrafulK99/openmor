@@ -125,20 +125,54 @@ export class DodoAdapter implements ProviderAdapter {
         ...(subscription ? [subscription.product_id] : []),
       ]);
 
-      // The API filters keys by customer and product, not payment, so match the payment here.
+      // Is this grant/key from this order? A grant records the payment (one-time) or the
+      // subscription (recurring) that triggered it, which ties the key to this exact order.
+      const ours = (r: { payment_id?: string | null; subscription_id?: string | null }) =>
+        r.payment_id === paymentId || (subscriptionId !== null && r.subscription_id === subscriptionId);
+
       const licenseKeys: DeliveredLicenseKey[] = [];
       if (customerId) {
         for (const productId of productIds) {
-          for await (const k of this.#client.licenseKeys.list({ customer_id: customerId, product_id: productId })) {
-            const ours = k.payment_id === paymentId || (subscriptionId !== null && k.subscription_id === subscriptionId);
-            if (!ours) continue;
-            licenseKeys.push({
-              id: k.id,
-              key: k.key,
-              status: k.status,
-              activationsLimit: k.activations_limit ?? null,
-              expiresAt: k.expires_at ?? null,
-            });
+          const product = await this.#client.products.retrieve(productId);
+          const entitlementIds = product.entitlements
+            .filter((e) => e.integration_type === "license_key")
+            .map((e) => e.id);
+
+          // Current model: licence keys are an entitlement on the product, delivered as grants.
+          // Grants can be filtered by customer, not payment, so the payment is matched here.
+          for (const entitlementId of entitlementIds) {
+            for await (const g of this.#client.entitlements.grants.list(entitlementId, { customer_id: customerId })) {
+              if (g.integration_type !== "license_key" || !ours(g) || g.status === "Revoked" || g.status === "Failed") {
+                continue;
+              }
+              licenseKeys.push(
+                g.license_key
+                  ? {
+                      id: g.license_key.id,
+                      key: g.license_key.key,
+                      status: g.license_key.status,
+                      activationsLimit: g.license_key.activations_limit ?? null,
+                      expiresAt: g.license_key.expires_at ?? null,
+                    }
+                  : // A manually fulfilled grant has no key until the merchant delivers it.
+                    { id: g.id, key: null, status: "pending", activationsLimit: null, expiresAt: null },
+              );
+            }
+          }
+
+          // Legacy products use the deprecated license_key_enabled flag and have no entitlement.
+          // Their keys carry payment_id/subscription_id, matched the same way.
+          if (entitlementIds.length === 0 && product.license_key_enabled) {
+            for await (const k of this.#client.licenseKeys.list({ customer_id: customerId, product_id: productId })) {
+              if (!ours(k)) continue;
+              licenseKeys.push({
+                id: k.id,
+                key: k.key,
+                status: k.status,
+                activationsLimit: k.activations_limit ?? null,
+                expiresAt: k.expires_at ?? null,
+              });
+            }
           }
         }
       }

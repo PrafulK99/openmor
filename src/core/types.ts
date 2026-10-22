@@ -110,8 +110,12 @@ export interface Payment {
 
 export interface DeliveredLicenseKey {
   id: string;
-  /** SECRET. Fetched live for the buyer's agent; never stored or logged by OpenMoR. */
-  key: string;
+  /**
+   * SECRET. Fetched live for the buyer's agent; never stored or logged by OpenMoR.
+   * Null while the provider has not issued it yet (e.g. a manually fulfilled grant).
+   */
+  key: string | null;
+  /** Key status ("active", "expired", "disabled"), or "pending" before the key exists. */
   status: string;
   activationsLimit: number | null;
   expiresAt: string | null;
