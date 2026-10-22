@@ -155,8 +155,10 @@ describe("get_order tool", () => {
     expect(logged.join("\n")).not.toContain(FAKE_LICENSE_KEY);
   });
 
-  it("returns INVALID_INPUT for an unknown order", async () => {
+  it("returns ORDER_NOT_FOUND for an unknown order", async () => {
     const r = await getOrderTool.handler({ order_id: "nope" }, env);
-    expect(text(r)).toBe('INVALID_INPUT: No order "nope". Use the order_id exactly as returned by checkout.');
+    expect(r.isError).toBe(true);
+    expect(text(r)).toBe('ORDER_NOT_FOUND: No order "nope". Use the order_id exactly as returned by checkout.');
+    expect(data(r).error.code).toBe("ORDER_NOT_FOUND");
   });
 });

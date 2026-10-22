@@ -10,7 +10,7 @@ import type { Fulfillment } from "@/core/types";
  */
 export async function getOrderFulfillment(deps: CoreDeps, orderId: string): Promise<Fulfillment | null> {
   const order = await deps.db.order.findUnique({ where: { id: orderId } });
-  if (!order) throw new OpenMorError("INVALID_INPUT", `No order "${orderId}"`);
+  if (!order) throw new OpenMorError("ORDER_NOT_FOUND", `No order "${orderId}"`);
   if ((order.status !== "paid" && order.status !== "fulfilled") || !order.providerPaymentId) return null;
 
   const merchant = await deps.db.merchant.findUnique({ where: { id: order.merchantId } });

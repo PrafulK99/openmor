@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { normalizeEmail } from "@/core/checkout";
+import { OpenMorError } from "@/core/errors";
 import { getOrderFulfillment } from "@/core/fulfillment";
 import { getOrder } from "@/core/orders";
 import { money, moneySchema } from "../format";
@@ -64,7 +65,7 @@ export const getOrderTool = defineTool({
     const orderId = input.order_id.trim();
     if (!orderId) invalid("order_id is required; use the order_id from checkout.");
     const order = await getOrder(deps, orderId);
-    if (!order) invalid(`No order "${orderId}". Use the order_id exactly as returned by checkout.`);
+    if (!order) throw new OpenMorError("ORDER_NOT_FOUND", `No order "${orderId}"`);
 
     const paid = PAID.has(order.status);
     let emailMatches = false;

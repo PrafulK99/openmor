@@ -70,7 +70,7 @@ describe("getOrderFulfillment", () => {
     expect(logs).not.toContain("portal_secret");
   });
 
-  it("rejects an unknown order", async () => {
-    await expect(getOrderFulfillment(t.deps, "nope")).rejects.toMatchObject({ code: "INVALID_INPUT" });
+  it("rejects an unknown order with ORDER_NOT_FOUND", async () => {
+    await expect(getOrderFulfillment(t.deps, "nope")).rejects.toMatchObject({ code: "ORDER_NOT_FOUND" });
   });
 });

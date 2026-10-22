@@ -7,6 +7,7 @@ export const ERROR_CODES = [
   "BUYER_NOT_LINKED",
   "PROVIDER_ERROR",
   "MERCHANT_NOT_FOUND",
+  "ORDER_NOT_FOUND",
   "INVALID_INPUT",
   // Something failed inside OpenMoR (e.g. the database). Details are never shown to agents.
   "INTERNAL_ERROR",

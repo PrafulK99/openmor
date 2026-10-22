@@ -17,6 +17,7 @@ export const ERROR_HINTS: Record<ErrorCode, string> = {
   BUYER_NOT_LINKED: "The buyer has not approved agent purchases; send them the approval link first.",
   PROVIDER_ERROR: "The payment provider could not answer; wait a moment and retry once.",
   MERCHANT_NOT_FOUND: "Use a merchant_id exactly as returned by search_products.",
+  ORDER_NOT_FOUND: "Use the order_id exactly as returned by checkout.",
   INVALID_INPUT: "Fix the argument named above and call the tool again.",
   INTERNAL_ERROR: "Something failed on OpenMoR's side; retry once, then tell the buyer to try later.",
 };
