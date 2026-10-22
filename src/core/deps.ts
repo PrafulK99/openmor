@@ -14,9 +14,23 @@ export type MerchantProviderConfig = Pick<
 
 export type AdapterFor = (merchant: MerchantProviderConfig) => ProviderAdapter;
 
+export interface EmailMessage {
+  to: string;
+  subject: string;
+  text: string;
+  html: string;
+}
+
+/** Sends one email. Throws EmailSendError on failure. Implemented in src/lib/email.ts. */
+export interface EmailSender {
+  send(message: EmailMessage, options?: { idempotencyKey?: string }): Promise<void>;
+}
+
 export interface CoreDeps {
   db: PrismaClient;
   adapterFor: AdapterFor;
+  /** For buyer approval emails. Absent in scripts and tests that never send mail. */
+  email?: EmailSender;
   /** Injectable clock for tests. Defaults to the real time. */
   now?: () => Date;
 }

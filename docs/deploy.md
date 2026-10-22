@@ -27,13 +27,15 @@ Set these under **Project > Settings > Environment Variables**, for the **Produc
 | `ENCRYPTION_KEY` | **The same key** as the environment whose database you point at. Merchant Dodo API keys and webhook secrets are encrypted with it; a different key makes every stored key unreadable. |
 | `APP_URL` | The public `https://` URL of the deployment, with no trailing slash, e.g. `https://openmor.vercel.app`. It's used in checkout return URLs. |
 | `DODO_ENVIRONMENT` | `test_mode`. Leave it in test mode until live mode is deliberately enabled per merchant. |
+| `RESEND_API_KEY` | Resend API key (Resend dashboard > API Keys). Used to email buyers the one-time link to approve an agent's spending permission. |
+| `EMAIL_FROM` | Optional. Sender for those emails, e.g. `OpenMoR <approvals@yourdomain.com>` (the domain must be verified in Resend). Leave it unset to use Resend's test sender `onboarding@resend.dev`, which can only email your own Resend account address, so real buyers will not receive anything until you set this. |
 
 Do **not** set these in Vercel:
 
 - `DIRECT_URL`: only the Prisma CLI uses it, on your machine, for migrations. The build doesn't need it.
 - `DODO_TEST_API_KEY`: only local scripts use it.
 
-In production the server refuses to start if `DATABASE_URL`, `ENCRYPTION_KEY` or `APP_URL` is missing, if `APP_URL` isn't `https://`, or if `ENCRYPTION_KEY` isn't 32 bytes in base64. Every route then returns 500, and **Runtime Logs** show a message starting `OpenMoR cannot start:` that names each problem variable (never its value).
+In production the server refuses to start if `DATABASE_URL`, `ENCRYPTION_KEY`, `APP_URL` or `RESEND_API_KEY` is missing, if `APP_URL` isn't `https://`, or if `ENCRYPTION_KEY` isn't 32 bytes in base64. Every route then returns 500, and **Runtime Logs** show a message starting `OpenMoR cannot start:` that names each problem variable (never its value).
 
 **Preview deployments:** these also run in production mode, so the same check applies. Either set the same variables for the **Preview** environment (with `APP_URL` set to the preview's https URL, and preferably a separate test database), or don't rely on previews.
 

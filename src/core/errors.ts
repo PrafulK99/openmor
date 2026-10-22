@@ -69,6 +69,22 @@ export class BuyerActionRequiredError extends Error {
   }
 }
 
+/**
+ * The email service refused or failed to send. Carries only the HTTP status and Resend's error
+ * name, never its message: that can quote the recipient's address.
+ */
+export class EmailSendError extends Error {
+  readonly status: number | null;
+  readonly errorName: string;
+
+  constructor(status: number | null, errorName: string) {
+    super(`Email send failed (${status ?? "no status"}, ${errorName})`);
+    this.name = "EmailSendError";
+    this.status = status;
+    this.errorName = errorName;
+  }
+}
+
 /** A webhook failed signature verification or could not be read. Answer HTTP 401; never log its body. */
 export class WebhookVerificationError extends Error {
   constructor(reason: string) {

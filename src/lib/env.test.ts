@@ -18,13 +18,18 @@ describe("parseEnv", () => {
     ).toThrow(/ENCRYPTION_KEY/);
   });
 
+  it("treats the Resend key as optional outside production", () => {
+    expect(parseEnv(valid).RESEND_API_KEY).toBeUndefined();
+    expect(parseEnv({ ...valid, RESEND_API_KEY: "re_x", EMAIL_FROM: "A <a@b.test>" })).toMatchObject({ RESEND_API_KEY: "re_x", EMAIL_FROM: "A <a@b.test>" });
+  });
+
   it("rejects an unknown Dodo environment", () => {
     expect(() => parseEnv({ ...valid, DODO_ENVIRONMENT: "prod" })).toThrow(/DODO_ENVIRONMENT/);
   });
 });
 
 describe("productionEnvProblems / assertProductionEnv", () => {
-  const prod = { ...valid, NODE_ENV: "production", APP_URL: "https://openmor.example.com" };
+  const prod = { ...valid, NODE_ENV: "production", APP_URL: "https://openmor.example.com", RESEND_API_KEY: "re_test_key" };
 
   it("accepts a complete production config", () => {
     expect(productionEnvProblems(prod)).toEqual([]);
@@ -36,7 +41,7 @@ describe("productionEnvProblems / assertProductionEnv", () => {
     expect(productionEnvProblems({ NODE_ENV: "test" })).toEqual([]);
   });
 
-  it.each(["DATABASE_URL", "ENCRYPTION_KEY", "APP_URL"])("reports a missing or blank %s", (name) => {
+  it.each(["DATABASE_URL", "ENCRYPTION_KEY", "APP_URL", "RESEND_API_KEY"])("reports a missing or blank %s", (name) => {
     expect(productionEnvProblems({ ...prod, [name]: undefined })).toContain(`${name} is not set`);
     expect(productionEnvProblems({ ...prod, [name]: "  " })).toContain(`${name} is not set`);
   });
@@ -46,6 +51,7 @@ describe("productionEnvProblems / assertProductionEnv", () => {
       "DATABASE_URL is not set",
       "ENCRYPTION_KEY is not set",
       "APP_URL is not set",
+      "RESEND_API_KEY is not set",
     ]);
   });
 

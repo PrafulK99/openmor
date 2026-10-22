@@ -10,6 +10,10 @@ const envSchema = z.object({
     }),
   DODO_ENVIRONMENT: z.enum(["test_mode", "live_mode"]).default("test_mode"),
   APP_URL: z.url(),
+  // Resend API key for buyer approval emails. Required in production (see productionEnvProblems).
+  RESEND_API_KEY: z.string().trim().min(1).optional(),
+  // Sender for approval emails. Resend's test sender can only email your own Resend account address.
+  EMAIL_FROM: z.string().trim().min(1).optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -31,7 +35,7 @@ export function parseEnv(source: Record<string, string | undefined>): Env {
   return result.data;
 }
 
-const REQUIRED_IN_PRODUCTION = ["DATABASE_URL", "ENCRYPTION_KEY", "APP_URL"] as const;
+const REQUIRED_IN_PRODUCTION = ["DATABASE_URL", "ENCRYPTION_KEY", "APP_URL", "RESEND_API_KEY"] as const;
 
 /**
  * Problems that must stop a production server from starting. Messages name the variable,
