@@ -18,6 +18,8 @@ async function getHandler(): Promise<(req: Request) => Promise<Response>> {
     createMcpHandler((server) => registerOpenMorTools(server, deps), {
       serverInfo: { name: "openmor", version: pkg.version },
       instructions: SERVER_INSTRUCTIONS,
+      // Verbose logs print raw errors, which can hold tool arguments (buyer emails).
+      verboseLogs: false,
     }),
   );
   return handler;

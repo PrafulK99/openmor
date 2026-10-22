@@ -27,6 +27,7 @@ export async function handleDodoWebhook(deps: CoreDeps, req: Request, merchantId
     if (err instanceof WebhookVerificationError) return json(401, { error: "invalid webhook signature" });
     if (err instanceof OpenMorError && err.code === "MERCHANT_NOT_FOUND") return json(404, { error: "unknown merchant" });
     // Name only: error messages can carry data from the payload or the database.
+    // eslint-disable-next-line no-console -- logs merchant id and error class name, nothing else
     console.error("dodo webhook processing failed", { merchantId, error: err instanceof Error ? err.name : "unknown" });
     return json(500, { error: "processing failed" });
   }
