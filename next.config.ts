@@ -32,9 +32,10 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: ["*.trycloudflare.com"],
   logging: {
     incomingRequests: {
-      // The dev request log prints full URLs, and Dodo's return URL to /orders/{id} carries
-      // the licence key as a query parameter. Never log those requests.
-      ignore: [/\/orders\//],
+      // The dev request log prints full URLs. Dodo's return URL to /orders/{id} carries the
+      // licence key as a query parameter, and the emailed /approve/{token} link carries the
+      // approval token in its path. Never log those requests.
+      ignore: [/\/orders\//, /\/approve\//],
     },
   },
   async headers() {

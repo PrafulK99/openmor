@@ -220,3 +220,105 @@ export async function createBuyerLink(deps: CheckoutDeps, input: CreateBuyerLink
     approvalExpiresAt,
   };
 }
+
+// ---------------------------------------------------------------------------------------------
+// Approval: the buyer opens the emailed link, reads the terms, and approves or declines.
+// Looking at a link never changes anything (email scanners open links); only a decision does.
+// ---------------------------------------------------------------------------------------------
+
+export type LinkUnavailable = "invalid" | "expired" | "already_used";
+
+export type ApprovalView =
+  | { kind: "ready"; buyerEmail: string; terms: LinkTerms }
+  | { kind: LinkUnavailable };
+
+export type DecisionResult =
+  | { kind: "approved" }
+  | { kind: "declined" }
+  /** The buyer has no saved card yet. The link stays pending so they can come back to it. */
+  | { kind: "no_saved_method" }
+  /** The payment provider could not be reached. The link stays pending. */
+  | { kind: "provider_unavailable" }
+  | { kind: LinkUnavailable };
+
+const MAX_TOKEN_LENGTH = 200;
+
+/** Find the link for an approval token and check it can still be decided. Read-only. */
+async function findDecidable(deps: CheckoutDeps, token: string) {
+  if (!token || token.length > MAX_TOKEN_LENGTH) return { unavailable: "invalid" as const };
+  const link = await deps.db.buyerLink.findUnique({ where: { approvalTokenHash: hashApprovalToken(token) } });
+  if (!link) return { unavailable: "invalid" as const };
+  // Approved, declined or revoked: the token has done its one job.
+  if (link.status !== "pending_approval") return { unavailable: "already_used" as const };
+  const now = nowFrom(deps).getTime();
+  if (now >= link.approvalExpiresAt.getTime() || now >= link.expiresAt.getTime()) return { unavailable: "expired" as const };
+  return { link };
+}
+
+/** What the approval page shows. Reads only: safe to call from a GET, however often. */
+export async function getApprovalView(deps: CheckoutDeps, token: string): Promise<ApprovalView> {
+  const found = await findDecidable(deps, token);
+  if (!found.link) return { kind: found.unavailable };
+  const { link } = found;
+  const merchant = await deps.db.merchant.findUnique({ where: { id: link.merchantId }, select: { name: true } });
+  if (!merchant) return { kind: "invalid" };
+  let productNames: string[] | null = null;
+  if (link.productScope.length) {
+    const products = await deps.db.product.findMany({ where: { id: { in: link.productScope } }, select: { id: true, name: true } });
+    productNames = link.productScope.map((id) => products.find((p) => p.id === id)?.name ?? "a product that is no longer listed");
+  }
+  return {
+    kind: "ready",
+    buyerEmail: link.buyerEmail,
+    terms: {
+      merchantName: merchant.name,
+      currency: link.currency,
+      monthlyCap: link.monthlyCapAmount,
+      perOrderCap: link.perOrderCapAmount,
+      productNames,
+      expiresAt: link.expiresAt,
+    },
+  };
+}
+
+/**
+ * Apply the buyer's decision. Tokens are single-use: only a pending, unexpired link can be
+ * decided, and the update is conditional so two clicks cannot both win.
+ *
+ * Approve looks up the buyer's Dodo customer by email and their saved card. With no saved card
+ * the link stays pending. Otherwise only the provider customer id and payment method id are
+ * stored (never card data) and the link becomes active.
+ */
+export async function decideApproval(deps: CheckoutDeps, token: string, decision: "approve" | "decline"): Promise<DecisionResult> {
+  const found = await findDecidable(deps, token);
+  if (!found.link) return { kind: found.unavailable };
+  const { link } = found;
+  const pending = { id: link.id, status: "pending_approval" as const };
+
+  if (decision === "decline") {
+    const { count } = await deps.db.buyerLink.updateMany({ where: pending, data: { status: "revoked", revokedAt: nowFrom(deps) } });
+    return count === 1 ? { kind: "declined" } : { kind: "already_used" };
+  }
+
+  const merchant = await deps.db.merchant.findUnique({ where: { id: link.merchantId } });
+  if (!merchant) return { kind: "invalid" };
+  let saved;
+  try {
+    saved = await deps.adapterFor(merchant).findSavedPaymentMethod(link.buyerEmail);
+  } catch (err) {
+    if (err instanceof ProviderError) return { kind: "provider_unavailable" };
+    throw err;
+  }
+  if (!saved) return { kind: "no_saved_method" };
+
+  const now = nowFrom(deps);
+  const { count } = await deps.db.buyerLink.updateMany({
+    // Re-check expiry in the same statement: the provider call above can take a while.
+    where: { ...pending, approvalExpiresAt: { gt: now }, expiresAt: { gt: now } },
+    data: { status: "active", approvedAt: now, providerCustomerId: saved.customerId, providerPaymentMethodId: saved.paymentMethodId },
+  });
+  if (count === 1) return { kind: "approved" };
+  // Lost a race: someone decided it meanwhile, or it expired while we waited for the provider.
+  const latest = await deps.db.buyerLink.findUnique({ where: { id: link.id }, select: { status: true } });
+  return { kind: latest?.status === "pending_approval" ? "expired" : "already_used" };
+}
