@@ -43,7 +43,13 @@ export function toolError(err: unknown): CallToolResult {
     // Core messages are sentence fragments; end them so the hint reads as its own sentence.
     message = /[.!?]$/.test(err.message.trim()) ? err.message.trim() : `${err.message.trim()}.`;
   }
-  const hint = ERROR_HINTS[code];
+  // An error may carry its own hint when the generic one for its code would mislead.
+  const ownHint = typeof details?.hint === "string" ? details.hint : undefined;
+  if (details && "hint" in details) {
+    const rest = Object.entries(details).filter(([key]) => key !== "hint");
+    details = rest.length ? Object.fromEntries(rest) : undefined;
+  }
+  const hint = ownHint ?? ERROR_HINTS[code];
   // For INVALID_INPUT the message is the fix ("buyer_country must be ..."), so one line is enough.
   const text = err instanceof InvalidInputError ? `${code}: ${message}` : `${code}: ${message} ${hint}`;
   return {

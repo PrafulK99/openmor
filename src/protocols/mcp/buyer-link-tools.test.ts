@@ -1,6 +1,7 @@
 import type { CallToolResult } from "@modelcontextprotocol/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { seedMerchant, seedProduct, setup } from "@/test/core-fixtures";
+import { EmailSendError } from "@/core/errors";
 import { fakeEmail, tokenFromEmail, type FakeEmail } from "@/test/fake-email";
 import type { ToolEnv } from "./tool";
 import { linkBuyerTool } from "./tools/link-buyer";
@@ -77,6 +78,17 @@ describe("link_buyer", () => {
   it("returns MERCHANT_NOT_FOUND for an unknown merchant", async () => {
     const r = await linkBuyerTool.handler(args({ merchant_id: "nope" }), env);
     expect(data(r).error.code).toBe("MERCHANT_NOT_FOUND");
+  });
+
+  it("says the email failed, with its own hint rather than the payment provider's", async () => {
+    email.send.mockRejectedValueOnce(new EmailSendError(403, "validation_error"));
+    const r = await linkBuyerTool.handler(args(), env);
+    expect(r.isError).toBe(true);
+    expect(data(r).error).toMatchObject({ code: "PROVIDER_ERROR", message: "The approval email could not be sent.", hint: expect.stringContaining("Nothing was created") });
+    expect(data(r).error.details).toBeUndefined();
+    expect(text(r)).not.toContain("payment provider");
+    expect(text(r)).not.toContain("buyer@example.com");
+    expect(t.db.tables.buyerLink).toHaveLength(0);
   });
 
   it("returns PROVIDER_ERROR with a retry hint when email cannot be sent, and leaves no link", async () => {

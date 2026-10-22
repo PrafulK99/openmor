@@ -168,7 +168,7 @@ describe("createBuyerLink", () => {
   it("removes the link and reports PROVIDER_ERROR without details when the email cannot be sent", async () => {
     email.send.mockRejectedValueOnce(new EmailSendError(403, "validation_error"));
     const err = await createBuyerLink(deps, input()).catch((e: unknown) => e);
-    expect(err).toMatchObject({ code: "PROVIDER_ERROR", message: "The approval email could not be sent. Try again in a minute." });
+    expect(err).toMatchObject({ code: "PROVIDER_ERROR", message: "The approval email could not be sent." });
     expect(t.db.tables.buyerLink).toHaveLength(0);
     expect(logged.join("\n")).not.toContain("buyer@example.com");
     // The log line carries the status and error name, nothing about the buyer or the token.
@@ -186,7 +186,7 @@ describe("createBuyerLink", () => {
       email.send.mockImplementationOnce(() => new Promise(() => {}));
       const pending = withDeadline(1000, () => createBuyerLink(deps, input())).catch((e: unknown) => e);
       await vi.advanceTimersByTimeAsync(1000);
-      expect(await pending).toMatchObject({ code: "PROVIDER_ERROR", message: expect.stringContaining("slow to send") });
+      expect(await pending).toMatchObject({ code: "PROVIDER_ERROR", message: "The approval email is slow to send." });
       expect(t.db.tables.buyerLink).toHaveLength(0);
     } finally {
       vi.useRealTimers();

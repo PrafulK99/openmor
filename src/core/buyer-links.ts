@@ -19,6 +19,9 @@ const MAX_SCOPE_PRODUCTS = 20;
 /** Approval emails to one address per hour, across all merchants. Stops agents from using us to spam. */
 export const MAX_APPROVAL_EMAILS_PER_HOUR = 3;
 
+const EMAIL_RETRY_HINT =
+  "Nothing was created. Wait a minute and call link_buyer again; if it keeps failing, tell the buyer the approval email could not be sent.";
+
 export function hashApprovalToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
@@ -204,10 +207,10 @@ export async function createBuyerLink(deps: CheckoutDeps, input: CreateBuyerLink
       // Status and error name only: the message can quote the recipient's address.
       // eslint-disable-next-line no-console -- no address, token or message: status and error name only
       console.error("approval email failed", { status: err.status, error: err.errorName });
-      throw new ProviderError("Email service", err.status ?? undefined, err.errorName, "The approval email could not be sent. Try again in a minute.");
+      throw new OpenMorError("PROVIDER_ERROR", "The approval email could not be sent.", { hint: EMAIL_RETRY_HINT });
     }
     if (err instanceof DeadlineExceededError) {
-      throw new ProviderError("Email service", undefined, "deadline exceeded", "The approval email is slow to send. Try again in a minute.");
+      throw new OpenMorError("PROVIDER_ERROR", "The approval email is slow to send.", { hint: EMAIL_RETRY_HINT });
     }
     throw err;
   }
