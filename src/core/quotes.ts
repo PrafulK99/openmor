@@ -1,8 +1,8 @@
-import type { Quote } from "@/generated/prisma/client";
+import type { Merchant, Product as ProductRow, Quote } from "@/generated/prisma/client";
 import { nowFrom, type CoreDeps } from "@/core/deps";
 import { InvalidInputError } from "@/core/errors";
 import { loadSellable } from "@/core/products";
-import type { QuoteBreakup } from "@/core/types";
+import type { ProviderQuote, QuoteBreakup } from "@/core/types";
 
 export const QUOTE_TTL_MS = 15 * 60 * 1000;
 const MAX_QUANTITY = 100;
@@ -112,6 +112,35 @@ export async function createQuote(deps: CoreDeps, input: CreateQuoteInput): Prom
     ...(discountCodes.length ? { discountCodes } : {}),
   });
 
+  return storeQuote(deps, {
+    merchant,
+    product,
+    preview,
+    quantity,
+    country,
+    state,
+    zip,
+    discountCodes,
+    ...(input.agentSessionId ? { agentSessionId: input.agentSessionId } : {}),
+  });
+}
+
+export interface StoreQuoteInput {
+  merchant: Merchant;
+  product: ProductRow;
+  /** A provider checkout preview for this product, already fetched. */
+  preview: ProviderQuote;
+  quantity: number;
+  country: string;
+  state: string | undefined;
+  zip: string | undefined;
+  discountCodes: string[];
+  agentSessionId?: string;
+}
+
+/** Store a provider preview as a quote valid for 15 minutes. */
+export async function storeQuote(deps: CoreDeps, input: StoreQuoteInput): Promise<QuoteView> {
+  const { merchant, product, preview, quantity, country, state, zip, discountCodes } = input;
   const line =
     preview.items.find((i) => i.productId === product.providerProductId) ?? preview.items[0];
   const isConverted = preview.currency.toUpperCase() !== product.currency.toUpperCase();

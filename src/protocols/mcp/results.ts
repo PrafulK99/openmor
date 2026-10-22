@@ -34,10 +34,12 @@ export const errorSchema = z.object({
 
 export function toolError(err: unknown): CallToolResult {
   let code: ErrorCode = "INTERNAL_ERROR";
+  let details: Record<string, unknown> | undefined;
   // Never pass unknown errors through: they can contain hostnames, SQL or stack details.
   let message = "Internal error.";
   if (err instanceof OpenMorError) {
     code = err.code;
+    details = err.details;
     // Core messages are sentence fragments; end them so the hint reads as its own sentence.
     message = /[.!?]$/.test(err.message.trim()) ? err.message.trim() : `${err.message.trim()}.`;
   }
@@ -47,7 +49,7 @@ export function toolError(err: unknown): CallToolResult {
   return {
     isError: true,
     content: [{ type: "text", text }],
-    structuredContent: { error: { code, message, hint } },
+    structuredContent: { error: { code, message, hint, ...(details ? { details } : {}) } },
   };
 }
 

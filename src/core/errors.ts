@@ -1,3 +1,5 @@
+import type { QuoteView } from "@/core/quotes";
+
 /** Stable error codes. Agents and clients match on these strings, so never rename them. */
 export const ERROR_CODES = [
   "QUOTE_EXPIRED",
@@ -19,11 +21,25 @@ export type ErrorCode = (typeof ERROR_CODES)[number];
 
 export class OpenMorError extends Error {
   readonly code: ErrorCode;
+  /** Extra machine-readable facts for the agent (e.g. how much of a limit is left). Never secrets. */
+  readonly details: Record<string, unknown> | undefined;
 
-  constructor(code: ErrorCode, message: string) {
+  constructor(code: ErrorCode, message: string, details?: Record<string, unknown>) {
     super(message);
     this.name = "OpenMorError";
     this.code = code;
+    this.details = details;
+  }
+}
+
+/** The re-checked price moved too far. Carries a fresh quote the buyer can be asked about. */
+export class PriceChangedError extends OpenMorError {
+  readonly freshQuote: QuoteView;
+
+  constructor(message: string, freshQuote: QuoteView) {
+    super("PRICE_CHANGED", message);
+    this.name = "PriceChangedError";
+    this.freshQuote = freshQuote;
   }
 }
 

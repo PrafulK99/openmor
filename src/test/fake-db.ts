@@ -93,17 +93,26 @@ export class FakeDb {
     return [];
   }
 
+  // Transactions run one at a time, like the row lock (`SELECT ... FOR UPDATE`) core takes on a
+  // buyer link: it makes concurrent checkouts on one link queue up. Never nest $transaction calls.
+  #txQueue: Promise<unknown> = Promise.resolve();
+
   /** Interactive transaction: runs fn against this fake and restores every table if it throws. */
   async $transaction<T>(fn: (tx: this) => Promise<T>): Promise<T> {
-    const snapshot = structuredClone(this.tables);
-    try {
-      return await fn(this);
-    } catch (err) {
-      for (const name of Object.keys(snapshot) as ModelName[]) {
-        this.tables[name].splice(0, this.tables[name].length, ...snapshot[name]);
+    const run = async (): Promise<T> => {
+      const snapshot = structuredClone(this.tables);
+      try {
+        return await fn(this);
+      } catch (err) {
+        for (const name of Object.keys(snapshot) as ModelName[]) {
+          this.tables[name].splice(0, this.tables[name].length, ...snapshot[name]);
+        }
+        throw err;
       }
-      throw err;
-    }
+    };
+    const result = this.#txQueue.then(run, run);
+    this.#txQueue = result.catch(() => undefined);
+    return result;
   }
 
   asPrisma(): PrismaClient {

@@ -23,7 +23,7 @@ export interface CheckoutResult {
   created: boolean;
 }
 
-const emailSchema = z.email().max(320);
+export const emailSchema = z.email().max(320);
 
 export function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
@@ -34,19 +34,19 @@ export function checkoutIdempotencyKey(quoteId: string, normalizedEmail: string)
   return createHash("sha256").update(`${quoteId}:${normalizedEmail}`).digest("hex");
 }
 
-function isUniqueViolation(err: unknown): boolean {
+export function isUniqueViolation(err: unknown): boolean {
   return typeof err === "object" && err !== null && (err as { code?: unknown }).code === "P2002";
 }
 
 /** Throw the error for a quote that cannot be claimed: QUOTE_USED if another order took it, else QUOTE_EXPIRED. */
-function refuseQuote(quote: Quote, quoteId: string): never {
+export function refuseQuote(quote: Quote, quoteId: string): never {
   if (quote.status === "used") {
     throw new OpenMorError("QUOTE_USED", `Quote "${quoteId}" was already checked out with a different buyer email`);
   }
   throw new OpenMorError("QUOTE_EXPIRED", `Quote "${quoteId}" is expired`);
 }
 
-function isClaimable(quote: Quote, now: Date): boolean {
+export function isClaimable(quote: Quote, now: Date): boolean {
   return quote.status === "open" && quote.expiresAt > now;
 }
 

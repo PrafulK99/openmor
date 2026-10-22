@@ -59,6 +59,9 @@ describe("checkout tool", () => {
       product_name: "ShareThings Lifetime",
       amount_due: { amount_minor: 5195, currency: "EUR", formatted: "€51.95" },
       is_new_order: true,
+      mode: "handoff",
+      fell_back_to_handoff: false,
+      fallback_reason: null,
     });
     expect(text(r)).toBe("Open this link to pay €51.95 for ShareThings Lifetime. The final amount is shown on the checkout page.");
     expect(t.db.tables.order[0]!.agentSessionId).toBe("ags_1");
