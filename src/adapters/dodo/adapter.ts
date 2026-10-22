@@ -17,6 +17,7 @@ import type {
   WebhookEvent,
   WebhookInput,
 } from "@/core/types";
+import { createDodoClient } from "./client";
 import { mapListedProduct, mapPayment, mapProduct, mapQuote, mapWebhookEvent } from "./map";
 
 export interface DodoAdapterOptions {
@@ -48,14 +49,8 @@ export class DodoAdapter implements ProviderAdapter {
     this.#apiKey = apiKey;
     this.#webhookSecret = webhookSecret || null;
     this.environment = environment;
-    // Pass every option explicitly: left out, the SDK falls back to DODO_PAYMENTS_* env vars
-    // and to live_mode. The caller decides the key and mode, never process.env.
-    this.#client = new DodoPayments({
-      bearerToken: apiKey,
-      environment,
-      baseURL: null,
-      webhookKey: null,
-    });
+    // Explicit key, mode, timeout and retries: see createDodoClient.
+    this.#client = createDodoClient({ apiKey, environment });
   }
 
   async listProducts(): Promise<Product[]> {
