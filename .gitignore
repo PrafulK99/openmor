@@ -30,9 +30,8 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files: real config stays local; the documented example is always tracked
-.env
-.env*.local
+# env files: every .env variant stays local; only the documented example is tracked
+.env*
 !.env.example
 
 # vercel
