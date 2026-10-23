@@ -10,6 +10,8 @@
 // "public-catalog" tag so a future admin action can call revalidateTag("public-catalog").
 import { cacheLife, cacheTag } from "next/cache";
 import { getPublicIndex, getPublicMerchant, getPublicProduct, isPublicSlug } from "@/core/public-catalog";
+import { buildMerchantLlmsTxt, buildNetworkLlmsTxt } from "@/core/public-formats";
+import { publicBaseUrl } from "@/lib/public-url";
 
 /** Served from cache for 5 minutes, refreshed in the background after 15, dropped after a day. */
 const CATALOG_LIFE = { stale: 300, revalidate: 900, expire: 86400 } as const;
@@ -49,6 +51,23 @@ export async function cachedPublicIndex() {
   cacheLife(CATALOG_LIFE);
   cacheTag("public-catalog");
   return getPublicIndex(await publicDeps());
+}
+
+/** /llms.txt as text. */
+export async function cachedNetworkLlmsTxt(): Promise<string> {
+  "use cache";
+  cacheLife(CATALOG_LIFE);
+  cacheTag("public-catalog");
+  return buildNetworkLlmsTxt({ baseUrl: publicBaseUrl(), merchants: await getPublicIndex(await publicDeps()) });
+}
+
+/** /m/{slug}/llms.txt as text, or null when there is no such public merchant. */
+export async function cachedMerchantLlmsTxt(slug: string): Promise<string | null> {
+  "use cache";
+  cacheLife(CATALOG_LIFE);
+  cacheTag("public-catalog", `public-merchant:${slug}`);
+  const merchant = await getPublicMerchant(await publicDeps(), slug);
+  return merchant ? buildMerchantLlmsTxt({ baseUrl: publicBaseUrl(), merchant }) : null;
 }
 
 /** Build-time list of merchant pages to prerender. Never throws and never returns an empty list. */
