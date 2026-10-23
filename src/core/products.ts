@@ -59,14 +59,19 @@ const providerDataSchema = z
   })
   .partial();
 
+/** The extra fields catalog sync stores in Product.providerData, parsed defensively. Never returns the raw JSON. */
+export function parseProductExtras(providerData: unknown): z.infer<typeof providerDataSchema> {
+  const parsed = providerDataSchema.safeParse(providerData ?? {});
+  return parsed.success ? parsed.data : {};
+}
+
 /** Full details of one agent-sellable product, from the synced catalog. */
 export async function getProductDetails(
   deps: CoreDeps,
   input: { merchantId: string; productId: string },
 ): Promise<ProductDetails> {
   const { merchant, product } = await loadSellable(deps, input.merchantId, input.productId);
-  const parsed = providerDataSchema.safeParse(product.providerData ?? {});
-  const extra = parsed.success ? parsed.data : {};
+  const extra = parseProductExtras(product.providerData);
   return {
     productId: product.id,
     merchant: { id: merchant.id, slug: merchant.slug, name: merchant.name },
