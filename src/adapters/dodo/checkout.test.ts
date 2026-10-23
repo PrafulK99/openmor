@@ -400,3 +400,33 @@ describe("findSavedPaymentMethod", () => {
     await expect(adapter().findSavedPaymentMethod("buyer@example.com")).rejects.toMatchObject({ code: "PROVIDER_ERROR", status: 500 });
   });
 });
+
+describe("inspectSavedMethods (diagnostics)", () => {
+  it("counts customers and each one's listed payment methods, asking for the address as typed and in lower case", async () => {
+    sdk.listCustomers.mockImplementation(({ email }: { email: string }) =>
+      pages(email === "Buyer@Example.com" ? [{ customer_id: "cus_mixed", email }] : [{ customer_id: "cus_lower", email }]),
+    );
+    sdk.retrievePaymentMethods.mockImplementation(async (id: string) => ({
+      items: id === "cus_mixed" ? [{ payment_method: "card", payment_method_id: "pm_1" }, { payment_method: "upi", payment_method_id: "pm_2" }] : [],
+    }));
+    const r = await adapter().inspectSavedMethods("  Buyer@Example.com ");
+    expect(r).toEqual({ customers: 2, methodCounts: [2, 0] });
+    expect(sdk.listCustomers.mock.calls.map((c) => c[0])).toEqual([{ email: "Buyer@Example.com" }, { email: "buyer@example.com" }]);
+    expect(JSON.stringify(r)).not.toMatch(/cus_|pm_/);
+  });
+
+  it("counts a customer returned by both queries once, and asks once when the address is already lower case", async () => {
+    sdk.listCustomers.mockImplementation(() => pages([{ customer_id: "cus_1", email: "buyer@example.com" }]));
+    sdk.retrievePaymentMethods.mockResolvedValue({ items: [] });
+    expect(await adapter().inspectSavedMethods("buyer@example.com")).toEqual({ customers: 1, methodCounts: [0] });
+    expect(sdk.listCustomers).toHaveBeenCalledTimes(1);
+    sdk.listCustomers.mockClear();
+    expect(await adapter().inspectSavedMethods("Buyer@example.com")).toEqual({ customers: 1, methodCounts: [0] });
+    expect(sdk.listCustomers).toHaveBeenCalledTimes(2);
+  });
+
+  it("reports no customers as zero", async () => {
+    sdk.listCustomers.mockImplementation(() => pages([]));
+    expect(await adapter().inspectSavedMethods("nobody@example.com")).toEqual({ customers: 0, methodCounts: [] });
+  });
+});

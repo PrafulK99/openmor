@@ -275,6 +275,31 @@ export class DodoAdapter implements ProviderAdapter {
     });
   }
 
+  /**
+   * Diagnostics for `pnpm merchant:cards`: how many Dodo customers match an email and how many
+   * payment methods the API lists for each. Counts only, never ids or card details.
+   *
+   * Dodo's email filter is exact and case-sensitive (checked in test mode), so this asks for the
+   * address as typed and in lower case, and counts each customer once.
+   */
+  async inspectSavedMethods(email: string): Promise<{ customers: number; methodCounts: number[] }> {
+    const typed = email.trim();
+    const variants = [...new Set([typed, typed.toLowerCase()])];
+    return this.#call(async (opts) => {
+      const seen = new Set<string>();
+      const methodCounts: number[] = [];
+      for (const variant of variants) {
+        for await (const customer of this.#client.customers.list({ email: variant }, opts)) {
+          if (seen.has(customer.customer_id) || seen.size >= MAX_CUSTOMERS_PER_EMAIL) continue;
+          seen.add(customer.customer_id);
+          const { items } = await this.#client.customers.retrievePaymentMethods(customer.customer_id, opts);
+          methodCounts.push(items.length);
+        }
+      }
+      return { customers: methodCounts.length, methodCounts };
+    });
+  }
+
   paymentIdentity(): PaymentIdentity {
     throw new NotImplementedError("DodoAdapter.paymentIdentity");
   }
