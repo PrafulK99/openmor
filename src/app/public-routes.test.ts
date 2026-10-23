@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { seedMerchant, seedProduct, setup } from "@/test/core-fixtures";
 import { GET as networkLlms } from "./llms.txt/route";
 import { GET as merchantLlms, generateStaticParams as llmsParams } from "./m/[merchantSlug]/llms.txt/route";
-import { PLACEHOLDER } from "./public-data";
+import { orDeferToRequest, PLACEHOLDER } from "./public-data";
 import robots from "./robots";
 import sitemap, { MAX_SITEMAP_URLS } from "./sitemap";
 
@@ -15,6 +15,8 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 vi.mock("next/cache", () => ({ cacheLife: () => {}, cacheTag: () => {} }));
+const deferred = vi.hoisted(() => ({ connection: vi.fn(async () => {}) }));
+vi.mock("next/server", () => ({ connection: deferred.connection }));
 vi.mock("@/lib/public-url", () => ({ publicBaseUrl: () => "https://openmor.example.com" }));
 
 const BASE = "https://openmor.example.com";
@@ -26,6 +28,7 @@ const ctx = (merchantSlug: string) => ({ params: Promise.resolve({ merchantSlug 
 const merchantFile = (slug: string) => merchantLlms(new Request(`${BASE}/m/${slug}/llms.txt`), ctx(slug));
 
 beforeEach(() => {
+  deferred.connection.mockClear();
   t = setup();
   state.db = t.db.asPrisma();
   merchantId = seedMerchant(t.db, { slug: "sharethings", name: "ShareThings" }).id;
@@ -128,5 +131,25 @@ describe("/robots.txt", () => {
       rules: [{ userAgent: "*", allow: ["/m/", "/llms.txt"], disallow: ["/api/", "/orders/"] }],
       sitemap: `${BASE}/sitemap.xml`,
     });
+  });
+});
+
+describe("an unreachable database at build time", () => {
+  it("defers the route to request time instead of failing the build, and rethrows the real error", async () => {
+    const failure = new Error("database unreachable");
+    await expect(orDeferToRequest(async () => Promise.reject(failure))).rejects.toBe(failure);
+    expect(deferred.connection).toHaveBeenCalledTimes(1);
+  });
+
+  it("does nothing special when the read works", async () => {
+    expect(await orDeferToRequest(async () => "ok")).toBe("ok");
+    expect(deferred.connection).not.toHaveBeenCalled();
+  });
+
+  it("applies to /llms.txt and /sitemap.xml", async () => {
+    vi.spyOn(t.db.merchant, "findMany").mockRejectedValue(new Error("database unreachable"));
+    await expect(networkLlms()).rejects.toThrow("database unreachable");
+    await expect(sitemap()).rejects.toThrow("database unreachable");
+    expect(deferred.connection).toHaveBeenCalledTimes(2);
   });
 });

@@ -9,6 +9,7 @@
 // within the revalidate time below, or at once on the next deploy. All entries carry the
 // "public-catalog" tag so a future admin action can call revalidateTag("public-catalog").
 import { cacheLife, cacheTag } from "next/cache";
+import { connection } from "next/server";
 import { getPublicIndex, getPublicMerchant, getPublicProduct, isPublicSlug } from "@/core/public-catalog";
 import { buildMerchantLlmsTxt, buildNetworkLlmsTxt } from "@/core/public-formats";
 import { publicBaseUrl } from "@/lib/public-url";
@@ -25,6 +26,21 @@ export const PLACEHOLDER = "__placeholder__";
 
 /** How many product pages are prerendered at build. The rest are rendered on first visit and then cached. */
 const MAX_PRERENDERED_PRODUCTS = 200;
+
+/**
+ * For routes that are prerendered at build time with no params (/llms.txt, /sitemap.xml). If the
+ * database cannot be read then (none configured, or an outage during a deploy), do not fail the
+ * build: wait for a request instead, which makes the route render at request time. The same read is
+ * then tried again with a live request, and a real failure there is a normal server error.
+ */
+export async function orDeferToRequest<T>(read: () => Promise<T>): Promise<T> {
+  try {
+    return await read();
+  } catch (error) {
+    await connection();
+    throw error;
+  }
+}
 
 async function publicDeps() {
   // Loaded lazily so importing this module needs no environment variables.
