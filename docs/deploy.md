@@ -7,7 +7,7 @@ This guide deploys the app to Vercel, with functions in Mumbai (`bom1`) next to 
 | Setting | Value | Set by |
 | --- | --- | --- |
 | Install | `pnpm install --frozen-lockfile` | `vercel.json` |
-| Build | `pnpm build` = `prisma generate && next build` (no migrations, no database access) | `vercel.json`, `package.json` |
+| Build | `pnpm build` = `prisma generate && next build`. No migrations. It reads the database (read-only) to prerender the public pages, see below | `vercel.json`, `package.json` |
 | Function region | `bom1` (Mumbai) | `vercel.json` |
 | Node.js | 20 or newer | `package.json` `engines` |
 
@@ -31,11 +31,13 @@ Set these under **Project > Settings > Environment Variables**, for the **Produc
 Do **not** set these in Vercel:
 
 - `DIRECT_URL`: only the Prisma CLI uses it, on your machine, for migrations. The build doesn't need it.
+
+**The build reads the database.** The public pages (`/m/...`, `/llms.txt`, `/sitemap.xml`) are prerendered from the catalog, so the build reads it through `DATABASE_URL`, read-only, and needs `DATABASE_URL`, `ENCRYPTION_KEY` and `APP_URL` at build time (Vercel provides project variables to the build by default). If the database cannot be reached during a build (a new project, or an outage), the build still succeeds and those pages are generated on their first visit instead. The links inside the pages use `APP_URL` as it was at build time, so redeploy after changing it. See [public-pages.md](public-pages.md).
 - `DODO_TEST_API_KEY`: only local scripts use it.
 
 In production the server refuses to start if `DATABASE_URL`, `ENCRYPTION_KEY` or `APP_URL` is missing, if `APP_URL` isn't `https://`, or if `ENCRYPTION_KEY` isn't 32 bytes in base64. Every route then returns 500, and **Runtime Logs** show a message starting `OpenMoR cannot start:` that names each problem variable (never its value).
 
-**Preview deployments:** these also run in production mode, so the same check applies. Either set the same variables for the **Preview** environment (with `APP_URL` set to the preview's https URL, and preferably a separate test database), or don't rely on previews.
+**Preview deployments:** these also run in production mode, so the same check applies. Either set the same variables for the **Preview** environment (with `APP_URL` set to any valid https URL, and preferably a separate test database), or don't rely on previews. On a preview, the public pages build their links from the preview's own address (`VERCEL_URL`), not from `APP_URL`. Vercel puts previews behind sign-in by default; see [public-pages.md](public-pages.md) for how to check one.
 
 ## 3. Run migrations (from your machine)
 
