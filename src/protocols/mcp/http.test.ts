@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { setup } from "@/test/core-fixtures";
-import { createOpenMorMcpHandler, methodNotAllowed } from "./http";
+import { createOpenMorMcpHandler, MCP_MAX_BODY_BYTES, methodNotAllowed } from "./http";
 import * as route from "@/app/api/mcp/route";
 
 const VERSION = "2026-07-28";
@@ -89,6 +89,63 @@ describe("MCP HTTP endpoint", () => {
     const [msg] = messages(await readToEnd(res));
     const tools = (msg!.result as { tools: { name: string }[] }).tools.map((t) => t.name);
     expect(tools).toEqual(["search_products", "get_product", "get_quote", "checkout", "get_order"]);
+  });
+});
+
+describe("request body limit", () => {
+  const padded = (bytes: number, headers: Record<string, string> = {}) => {
+    const base = JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list", params: { pad: "" } });
+    const body = JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list", params: { pad: "x".repeat(bytes - base.length) } });
+    return { body, headers };
+  };
+  const send = (body: BodyInit, headers: Record<string, string> = {}) =>
+    handler()(
+      new Request("http://localhost/api/mcp", {
+        method: "POST",
+        headers: { accept: "application/json, text/event-stream", "content-type": "application/json", "mcp-protocol-version": VERSION, "mcp-method": "tools/list", ...headers },
+        body,
+        ...(body instanceof ReadableStream ? { duplex: "half" } : {}),
+      } as RequestInit),
+    );
+
+  it("is 64 KiB", () => {
+    expect(MCP_MAX_BODY_BYTES).toBe(65536);
+  });
+
+  it("answers 413 in JSON-RPC form, with fixed text, for a body over the limit", async () => {
+    const res = await send(padded(MCP_MAX_BODY_BYTES + 1).body);
+    expect(res.status).toBe(413);
+    expect(res.headers.get("content-type")).toBe("application/json");
+    const text = await res.text();
+    expect(JSON.parse(text)).toEqual({ jsonrpc: "2.0", error: { code: -32600, message: "Request body too large." }, id: null });
+    expect(text).not.toContain("xxxx");
+  });
+
+  it("measures the real body: a short declared length does not get a big body through", async () => {
+    const res = await send(padded(MCP_MAX_BODY_BYTES + 1000).body, { "content-length": "20" });
+    expect(res.status).toBe(413);
+  });
+
+  it("cuts off a streamed body that declares no length", async () => {
+    const chunk = new TextEncoder().encode("x".repeat(16 * 1024));
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        for (let i = 0; i < 8; i++) controller.enqueue(chunk);
+        controller.close();
+      },
+    });
+    expect((await send(stream)).status).toBe(413);
+  });
+
+  it("lets a body of exactly the limit through to the handler", async () => {
+    const res = await send(padded(MCP_MAX_BODY_BYTES).body);
+    expect(res.status).not.toBe(413);
+  });
+
+  it("still serves a normal request with the body passed on intact", async () => {
+    const res = await handler()(rpc("tools/list"));
+    expect(res.status).toBe(200);
+    expect(JSON.stringify(messages(await readToEnd(res)))).toContain("search_products");
   });
 });
 

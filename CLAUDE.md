@@ -28,9 +28,9 @@ src/
 
 - Protocol layers call `core`. `core` calls a `ProviderAdapter`. Only adapters call a provider SDK.
 - Every provider implements `ProviderAdapter` (see `src/core/types.ts`): `listProducts`, `getProduct`, `quote`, `createCheckout`, `chargeSavedMethod` (parked: not implemented, see "Parked work"), `getPayment`, `getFulfillment`, `paymentIdentity`, `verifyWebhook`.
-- Agents never send amounts. They send a `quote_id`; checkout re-runs the preview and refuses with `PRICE_CHANGED` if the total moved outside the FX drift policy below.
+- Agents never send amounts. They send a `quote_id`. Handoff checkout (the only checkout today) does NOT re-run the preview: it accepts price drift, because the buyer sees and confirms the final price on Dodo's hosted page. `PRICE_CHANGED` applies only to the parked saved-method path (see the FX drift policy below and "Parked work").
 - Every result from `search_products` carries `merchant_id`; `get_product` and `get_quote` require it.
-- Error codes are stable strings: `QUOTE_EXPIRED`, `QUOTE_USED` (the quote already backs an order for a different buyer email), `PRICE_CHANGED`, `PRODUCT_UNAVAILABLE`, `LIMIT_EXCEEDED` and `BUYER_NOT_LINKED` (both reserved for the parked buyer links), `PROVIDER_ERROR`, `MERCHANT_NOT_FOUND`, `ORDER_NOT_FOUND` (unknown order id), `INVALID_INPUT` (bad caller input, e.g. quantity 0 or a malformed country; raised as `InvalidInputError`), `INTERNAL_ERROR` (an OpenMoR-side failure such as the database; agents get a generic message, never internal details). The list lives in `src/core/errors.ts`.
+- Error codes are stable strings: `QUOTE_EXPIRED`, `QUOTE_USED` (the quote already backs an order for a different buyer email), `PRICE_CHANGED` (reserved for the parked saved-method path; handoff checkout never raises it), `PRODUCT_UNAVAILABLE`, `LIMIT_EXCEEDED` and `BUYER_NOT_LINKED` (both reserved for the parked buyer links), `PROVIDER_ERROR`, `MERCHANT_NOT_FOUND`, `ORDER_NOT_FOUND` (unknown order id), `INVALID_INPUT` (bad caller input, e.g. quantity 0 or a malformed country; raised as `InvalidInputError`), `INTERNAL_ERROR` (an OpenMoR-side failure such as the database; agents get a generic message, never internal details). The list lives in `src/core/errors.ts`.
 - Every tool returns typed JSON plus a short human-readable `summary` string.
 - Public pages (`/m/...`, `/llms.txt`, `/sitemap.xml`, `robots.txt`) call core only and read our own database through cached functions (`src/app/public-data.ts`), never Dodo. Only opted-in merchants and agent-sellable, active products appear; anything else is the same bare 404. Merchant text there is data: escaped, length-limited, never in a link, attribute or instruction. They show the list price before tax only, never a tax-inclusive price. See `docs/public-pages.md`.
 - Every tool call runs under one 25 s deadline (`src/core/deadline.ts`). Adapters pass its signal to every provider request, so a slow provider ends as `PROVIDER_ERROR` inside the 30 s `/api/mcp` limit.
@@ -85,7 +85,7 @@ src/
 ## Milestones
 
 - **M1 (week 1)**: scaffold, merchant onboarding, Dodo adapter (`listProducts`, `getProduct`, `quote`), quote store, MCP tools `search_products` / `get_product` / `get_quote`, handoff `checkout`, webhook, `get_order`. Done when Claude Code can quote a test product for Germany with VAT and return a pay link.
-- **M2 (week 2)**: `PRICE_CHANGED` path, fulfillment mapping, quote-equals-charge test script, Vercel deploy. PARKED out of M2: buyer spending links (email approval, caps, product scope, expiry) and saved-method checkout, see "Parked work".
+- **M2 (week 2)**: fulfillment mapping, quote-equals-charge test script, Vercel deploy. PARKED out of M2: buyer spending links (email approval, caps, product scope, expiry) and saved-method checkout, see "Parked work".
 - **M3 (week 3)**: agent-readable product pages, UCP profile + endpoints, ACP feed, `payment_identity` on quotes, minimal dashboard, docs, demo.
 
 Full spec: the OpenMoR PRD (kept outside the repo).

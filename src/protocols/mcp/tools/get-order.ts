@@ -13,7 +13,7 @@ const inputSchema = z.object({
   buyer_email: z
     .string()
     .optional()
-    .describe("The email used at checkout. Required to receive the licence key and portal link once paid."),
+    .describe("The email used at checkout. Required to receive the payment link while unpaid, and the licence key and portal link once paid."),
 });
 
 const fulfillmentSchema = z.object({
@@ -43,7 +43,10 @@ const outputSchema = z.object({
   quoted_total: moneySchema,
   amount_charged: moneySchema.nullable().describe("What was actually charged. Null until paid."),
   paid_at: z.string().nullable(),
-  checkout_url: z.string().nullable().describe("Payment link, while the order is not paid."),
+  checkout_url: z
+    .string()
+    .nullable()
+    .describe("Payment link, while the order is not paid. Null unless buyer_email matches the order."),
   fulfillment: fulfillmentSchema.nullable().describe("What the buyer received, fetched live. Null until paid, or without buyer_email."),
 });
 
@@ -57,7 +60,7 @@ export const getOrderTool = defineTool({
     "Call it after the buyer says they have paid; do not poll it in a loop.",
     "Pass buyer_email (the one used at checkout) to receive the delivery: licence keys, subscription status, credits and a customer portal link, fetched live from Dodo Payments.",
     "Give the licence key and portal link only to the buyer, and do not store or repeat them anywhere else. The buyer also gets Dodo's receipt email.",
-    "If status is pending_payment the buyer has not finished paying: give them the checkout_url again. If it is failed, they can retry on the same link.",
+    "If status is pending_payment the buyer has not finished paying: call get_order with buyer_email to get the checkout_url and give it to them again. If it is failed, they can retry on the same link.",
     "Report amount_charged as what the buyer paid; it can differ slightly from quoted_total for converted prices. Never invent a status, price or licence key.",
   ].join(" "),
   inputSchema,
@@ -75,7 +78,8 @@ export const getOrderTool = defineTool({
     if (input.buyer_email !== undefined && input.buyer_email.trim() !== "") {
       const row = await deps.db.order.findUnique({ where: { id: order.id }, select: { buyerEmail: true } });
       emailMatches = row?.buyerEmail === normalizeEmail(input.buyer_email);
-      if (!emailMatches) invalid("buyer_email does not match this order; use the email given at checkout.");
+      // A wrong email is answered exactly like an unknown order: the caller learns nothing about the order.
+      if (!emailMatches) throw new OpenMorError("ORDER_NOT_FOUND", `No order "${orderId}"`);
     }
 
     // Secrets (licence keys, portal link) are fetched live, only for the buyer, and never stored.
@@ -117,9 +121,9 @@ export const getOrderTool = defineTool({
         summary = `Payment received: ${amount}${drift} for ${productName}. Call get_order again with buyer_email to get the licence key and portal link.`;
       }
     } else if (order.status === "pending_payment") {
-      summary = `Waiting for payment of ${quoted.formatted} for ${productName}. If the buyer has not paid yet, give them the checkout link again.`;
+      summary = `Waiting for payment of ${quoted.formatted} for ${productName}. If the buyer has not paid yet, ${emailMatches ? "give them the checkout link again" : "call get_order again with buyer_email to get the checkout link"}.`;
     } else if (order.status === "failed" || order.status === "cancelled") {
-      summary = `The last payment attempt for ${productName} ${order.status === "failed" ? "failed" : "was cancelled"}. The buyer can try again on the same checkout link.`;
+      summary = `The last payment attempt for ${productName} ${order.status === "failed" ? "failed" : "was cancelled"}. The buyer can try again on the same checkout link${emailMatches ? "" : " (call get_order with buyer_email to get it)"}.`;
     } else {
       summary = `Order for ${productName} is ${order.status}.`;
     }
@@ -135,7 +139,8 @@ export const getOrderTool = defineTool({
         quoted_total: quoted,
         amount_charged: charged,
         paid_at: order.paidAt ? order.paidAt.toISOString() : null,
-        checkout_url: paid ? null : order.checkoutUrl,
+        // The payment link needs the same proof as the licence key: the email used at checkout.
+        checkout_url: !paid && emailMatches ? order.checkoutUrl : null,
         fulfillment,
       },
       summary,
