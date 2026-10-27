@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { Quote } from "@/generated/prisma/client";
 import { nowFrom, type CoreDeps } from "@/core/deps";
 import { InvalidInputError } from "@/core/errors";
@@ -119,6 +120,7 @@ export async function createQuote(deps: CoreDeps, input: CreateQuoteInput): Prom
   const now = nowFrom(deps);
   const quote = await deps.db.quote.create({
     data: {
+      id: randomUUID(),
       merchantId: merchant.id,
       productId: product.id,
       agentSessionId: input.agentSessionId ?? null,

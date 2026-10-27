@@ -145,3 +145,22 @@ describe("getQuote", () => {
     expect(await getQuote(t.deps, "nope")).toBeNull();
   });
 });
+
+describe("quote ids", () => {
+  it("are random UUIDs, one per quote", async () => {
+    const ids = new Set<string>();
+    for (let i = 0; i < 5; i++) {
+      ids.add((await createQuote(t.deps, { merchantId, productId, quantity: 1, buyer })).id);
+    }
+    expect(ids.size).toBe(5);
+    for (const id of ids) expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+  });
+
+  it("keep working for quotes that were stored with an old-style id", async () => {
+    const q = await createQuote(t.deps, { merchantId, productId, quantity: 1, buyer });
+    const legacyId = "cm0legacyquoteid0000000001";
+    t.db.tables.quote.find((row) => row.id === q.id)!.id = legacyId;
+    expect(await getQuote(t.deps, q.id)).toBeNull();
+    expect(await getQuote(t.deps, legacyId)).toMatchObject({ id: legacyId, merchantId, productId });
+  });
+});

@@ -158,6 +158,57 @@ describe("get_order tool", () => {
     expect(JSON.stringify(wrong)).not.toContain(FAKE_LICENSE_KEY);
   });
 
+  describe("the payment link needs the buyer's email", () => {
+    const LINK = "https://test.checkout.dodopayments.com/session/cks_1";
+
+    it("is withheld from every part of the response without the email, while the status is still shown", async () => {
+      const r = await getOrderTool.handler({ order_id: orderId }, env);
+      expect(r.isError).toBeUndefined();
+      expect(data(r)).toMatchObject({ status: "pending_payment", checkout_url: null });
+      expect(JSON.stringify(r)).not.toContain(LINK);
+      expect(text(r)).toMatch(/call get_order again with buyer_email to get the checkout link/);
+      const blank = await getOrderTool.handler({ order_id: orderId, buyer_email: "  " }, env);
+      expect(data(blank).checkout_url).toBeNull();
+      expect(JSON.stringify(blank)).not.toContain(LINK);
+    });
+
+    it("is returned with the matching email (case and spacing do not matter)", async () => {
+      const r = await getOrderTool.handler({ order_id: orderId, buyer_email: " B@X.test " }, env);
+      expect(data(r).checkout_url).toBe(LINK);
+    });
+
+    it("is withheld for a failed order without the email too", async () => {
+      await handleWebhook(t.deps, {
+        merchantId,
+        ...signedWebhook({
+          id: "msg_failed",
+          type: "payment.failed",
+          occurredAt: "2026-10-21T12:06:00.000Z",
+          payment: payment({ status: "failed", metadata: { openmor_order_id: orderId } }),
+        }),
+      });
+      const r = await getOrderTool.handler({ order_id: orderId }, env);
+      expect(data(r)).toMatchObject({ status: "failed", checkout_url: null });
+      expect(JSON.stringify(r)).not.toContain(LINK);
+    });
+
+    it("a wrong email gets exactly the answer an unknown order gets, paid or not", async () => {
+      const unknown = await getOrderTool.handler({ order_id: "no-such-order", buyer_email: "attacker@x.test" }, env);
+      const wrongPending = await getOrderTool.handler({ order_id: orderId, buyer_email: "attacker@x.test" }, env);
+      await pay(orderId);
+      const wrongPaid = await getOrderTool.handler({ order_id: orderId, buyer_email: "attacker@x.test" }, env);
+      for (const wrong of [wrongPending, wrongPaid]) {
+        expect(wrong.isError).toBe(true);
+        expect(data(wrong).error.code).toBe("ORDER_NOT_FOUND");
+        // Only the id the caller sent differs.
+        expect(text(wrong).replace(orderId, "X")).toBe(text(unknown).replace("no-such-order", "X"));
+        expect(JSON.stringify(wrong.structuredContent).replace(orderId, "X")).toBe(JSON.stringify(unknown.structuredContent).replace("no-such-order", "X"));
+        expect(JSON.stringify(wrong)).not.toContain(LINK);
+        expect(JSON.stringify(wrong)).not.toContain(FAKE_LICENSE_KEY);
+      }
+    });
+  });
+
   it("never writes the licence key to the database or logs", async () => {
     await pay(orderId);
     await getOrderTool.handler({ order_id: orderId, buyer_email: "b@x.test" }, env);
