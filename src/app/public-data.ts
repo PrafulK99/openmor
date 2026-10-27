@@ -10,7 +10,7 @@
 // "public-catalog" tag so a future admin action can call revalidateTag("public-catalog").
 import { cacheLife, cacheTag } from "next/cache";
 import { connection } from "next/server";
-import { getPublicIndex, getPublicMerchant, getPublicProduct, isPublicSlug } from "@/core/public-catalog";
+import { getPublicCatalog, getPublicIndex, getPublicMerchant, getPublicProduct, isPublicSlug } from "@/core/public-catalog";
 import { buildMerchantLlmsTxt, buildNetworkLlmsTxt } from "@/core/public-formats";
 import { buildMerchantMarkdown, buildProductMarkdown } from "@/core/public-markdown";
 import { publicBaseUrl } from "@/lib/public-url";
@@ -130,4 +130,12 @@ export async function cachedProductMarkdown(slug: string, productId: string): Pr
   cacheTag("public-catalog", `public-merchant:${slug}`);
   const data = await getPublicProduct(await publicDeps(), slug, productId);
   return data ? buildProductMarkdown({ baseUrl: publicBaseUrl(), data }) : null;
+}
+
+/** The whole public catalog for the UCP catalog endpoints: opted-in merchants and their sellable products. */
+export async function cachedPublicCatalog() {
+  "use cache";
+  cacheLife(CATALOG_LIFE);
+  cacheTag("public-catalog");
+  return getPublicCatalog(await publicDeps());
 }
