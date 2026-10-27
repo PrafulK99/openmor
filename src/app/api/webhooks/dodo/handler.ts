@@ -2,6 +2,7 @@
 import type { CoreDeps } from "@/core/deps";
 import { OpenMorError, WebhookVerificationError } from "@/core/errors";
 import { handleWebhook } from "@/core/webhooks";
+import { readBodyBytes } from "@/lib/read-body";
 
 const MAX_BODY_BYTES = 1024 * 1024;
 
@@ -14,10 +15,10 @@ const json = (status: number, body: Record<string, unknown>) =>
  * verification it is untrusted, and after it holds buyer personal data.
  */
 export async function handleDodoWebhook(deps: CoreDeps, req: Request, merchantId: string): Promise<Response> {
-  const declared = Number(req.headers.get("content-length") ?? 0);
-  if (declared > MAX_BODY_BYTES) return json(413, { error: "payload too large" });
-  const rawBody = await req.text();
-  if (Buffer.byteLength(rawBody) > MAX_BODY_BYTES) return json(413, { error: "payload too large" });
+  // Measured on the bytes actually received: a declared Content-Length is only a shortcut.
+  const body = await readBodyBytes(req, MAX_BODY_BYTES);
+  if (!body.ok) return json(413, { error: "payload too large" });
+  const rawBody = new TextDecoder().decode(body.bytes);
 
   const headers = Object.fromEntries(req.headers.entries());
   try {

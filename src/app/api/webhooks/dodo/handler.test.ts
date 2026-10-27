@@ -78,4 +78,19 @@ describe("handleDodoWebhook", () => {
     const big = new Request("http://localhost/x", { method: "POST", body: "x".repeat(1024 * 1024 + 1) });
     expect((await handleDodoWebhook(t.deps, big, merchantId)).status).toBe(413);
   });
+
+  it("measures the real body, not the declared length", async () => {
+    const lying = new Request("http://localhost/x", { method: "POST", headers: { "content-length": "10" }, body: "x".repeat(1024 * 1024 + 1) });
+    expect((await handleDodoWebhook(t.deps, lying, merchantId)).status).toBe(413);
+
+    const chunk = new TextEncoder().encode("x".repeat(256 * 1024));
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        for (let i = 0; i < 5; i++) controller.enqueue(chunk);
+        controller.close();
+      },
+    });
+    const chunked = new Request("http://localhost/x", { method: "POST", body: stream, duplex: "half" } as RequestInit);
+    expect((await handleDodoWebhook(t.deps, chunked, merchantId)).status).toBe(413);
+  });
 });
