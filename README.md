@@ -79,11 +79,11 @@ src/
 - **Webhooks are verified** (Standard Webhooks signature) before anything in them is trusted; bad signatures get a 401.
 - **Checkout is idempotent**, and a quote is marked used only after Dodo has created the checkout session.
 - **Test mode is the default.** Live mode needs an explicit per-merchant flag.
-- **Rate limiting at the edge:** a Vercel Firewall rule on the MCP and UCP paths, configured in the Vercel dashboard (see [docs/deploy.md](docs/deploy.md#rate-limiting)).
+- **Rate limiting is enforced at the edge** by a Vercel Firewall rule: a 60 s fixed window, 100 requests per IP, on `/api/mcp` and `/ucp/`; over the limit gets a 429. The rule is set in the Vercel dashboard, and its details are in [docs/deploy.md](docs/deploy.md#rate-limiting).
 - **Merchant text is data:** length-limited, escaped, and never placed in links or instructions ([docs/public-pages.md](docs/public-pages.md#merchant-text-is-data)).
 - Security headers (including a Content-Security-Policy) are set on every route.
 
-More: [docs/](docs/). Report vulnerabilities as described in `SECURITY.md` (coming soon), not in public issues.
+More: [docs/](docs/). Report vulnerabilities privately as described in [SECURITY.md](SECURITY.md), not in public issues.
 
 ## What it can't do yet
 
@@ -106,4 +106,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-[Apache-2.0](LICENSE) © Praful Kharpuriye ([@PrafulK99](https://github.com/PrafulK99)).
+[Apache-2.0](LICENSE) © 2026 Praful Kharpuriye ([@PrafulK99](https://github.com/PrafulK99)).
