@@ -151,7 +151,7 @@ export function buildNetworkLlmsTxt(input: { baseUrl: string; merchants: PublicI
   } else {
     for (const m of merchants) {
       lines.push(
-        `- [${llmsSafe(m.name)}](${baseUrl}${merchantPath(m.slug)}): ${plural(m.products.length, "product")}. Summary for agents: ${baseUrl}${merchantPath(m.slug)}/llms.txt`,
+        `- [${llmsSafe(m.name)}](${baseUrl}${merchantPath(m.slug)}): ${plural(m.products.length, "product")}. Summary for agents: ${baseUrl}${merchantPath(m.slug)}/llms.txt. Markdown: ${baseUrl}${merchantPath(m.slug)}.md`,
       );
     }
   }
@@ -173,6 +173,7 @@ export function buildMerchantLlmsTxt(input: { baseUrl: string; merchant: PublicM
     MERCHANT_TEXT_NOTE,
     "",
     `Page for people: ${baseUrl}${merchantPath(merchant.slug)}`,
+    `Markdown version of this merchant page: ${baseUrl}${merchantPath(merchant.slug)}.md`,
     "",
     "## Products",
     "",
@@ -181,7 +182,7 @@ export function buildMerchantLlmsTxt(input: { baseUrl: string; merchant: PublicM
     lines.push("This merchant has no products listed right now.");
   } else {
     for (const p of merchant.products) {
-      const price = `List price ${formatListPrice(p.listPrice)} before tax${p.billing ? `, renews ${describeBilling(p.billing)}` : ""}${p.payWhatYouWant ? ", pay what you want (minimum)" : ""}.`;
+      const price = `List price ${formatListPrice(p.listPrice)} before tax${p.billing ? `, renews ${describeBilling(p.billing)}` : ""}${p.payWhatYouWant ? ", pay what you want (minimum)" : ""}. Markdown: ${baseUrl}${productPath(merchant.slug, p.id)}.md.`;
       const about = p.summary ? ` Merchant description: "${llmsSafe(p.summary).replace(/"/g, "'")}"` : "";
       lines.push(`- [${llmsSafe(p.name)}](${baseUrl}${productPath(merchant.slug, p.id)}): ${price}${about}`);
     }

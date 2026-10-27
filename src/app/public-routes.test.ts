@@ -43,7 +43,7 @@ describe("/llms.txt", () => {
     const body = await res.text();
     expect(body.startsWith("# OpenMoR\n\n> ")).toBe(true);
     expect(body).toContain(`${BASE}/api/mcp`);
-    expect(body).toContain(`- [ShareThings](${BASE}/m/sharethings): 1 product. Summary for agents: ${BASE}/m/sharethings/llms.txt`);
+    expect(body).toContain(`- [ShareThings](${BASE}/m/sharethings): 1 product. Summary for agents: ${BASE}/m/sharethings/llms.txt. Markdown: ${BASE}/m/sharethings.md`);
     expect(body).toContain("## Merchants");
     expect(body).toContain(`- [Sitemap](${BASE}/sitemap.xml)`);
   });
@@ -66,7 +66,7 @@ describe("/m/{slug}/llms.txt", () => {
     expect(res.headers.get("content-type")).toBe("text/plain; charset=utf-8");
     const body = await res.text();
     expect(body).toContain("# ShareThings");
-    expect(body).toContain(`- [ShareThings Lifetime](${BASE}/m/sharethings/${liveId}): List price $49.00 before tax.`);
+    expect(body).toContain(`- [ShareThings Lifetime](${BASE}/m/sharethings/${liveId}): List price $49.00 before tax. Markdown: ${BASE}/m/sharethings/${liveId}.md.`);
     expect(body).toContain('Call search_products with merchant "sharethings"');
     expect(body).toContain("get_quote");
   });
