@@ -163,7 +163,7 @@ describe("llms.txt format", () => {
     expect(text).toContain('Call search_products with merchant "sharethings"');
     expect(text).toContain("never ask a buyer for card details");
     const lifetime = merchant.products.find((p) => p.name === "ShareThings Lifetime")!;
-    expect(text).toContain(`- [ShareThings Lifetime](${BASE}/m/sharethings/${lifetime.id}): List price $49.00 before tax. Merchant description: "Pay once, share forever."`);
+    expect(text).toContain(`- [ShareThings Lifetime](${BASE}/m/sharethings/${lifetime.id}): List price $49.00 before tax. Markdown: ${BASE}/m/sharethings/${lifetime.id}.md. Merchant description: "Pay once, share forever."`);
     expect(text).toMatch(/List price \$5\.00 before tax, renews every month\./);
     expect(text).not.toMatch(/including (tax|vat)/i);
     expect(text).toContain(TAX_NOTE);

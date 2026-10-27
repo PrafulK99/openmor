@@ -37,6 +37,10 @@ export function publicText(value: string | null | undefined, max: number): strin
   return limitText(value.replace(INVISIBLE, "").replace(/\s+/g, " "), max);
 }
 
+export function isPublicProductId(value: string): boolean {
+  return PRODUCT_ID_PATTERN.test(value);
+}
+
 export function isPublicSlug(value: string): boolean {
   return SLUG_PATTERN.test(value);
 }

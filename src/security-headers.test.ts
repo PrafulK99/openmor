@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 import nextConfig from "../next.config";
 
-/** Headers of the single catch-all rule, which applies to every route. */
+/** Headers of the catch-all rule, which applies to every route. */
 async function allRouteHeaders(): Promise<Record<string, string>> {
-  const rules = (await nextConfig.headers?.()) ?? [];
-  expect(rules.map((r) => r.source)).toEqual(["/:path*"]);
+  // The other rules only add a Link header to the public pages (see twin-config.ts).
+  const rules = ((await nextConfig.headers?.()) ?? []).filter((r) => r.source === "/:path*");
+  expect(rules).toHaveLength(1);
   return Object.fromEntries(rules.flatMap((r) => r.headers.map((h) => [h.key.toLowerCase(), h.value])));
 }
 

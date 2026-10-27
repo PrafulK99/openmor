@@ -7,10 +7,35 @@ agent (or a search engine, or a person) can see what is for sale without using t
 | --- | --- |
 | `/m/{merchantSlug}` | The merchant, its agent-sellable products (name and short description), and how to get a price. |
 | `/m/{merchantSlug}/{productId}` | One product: description, **list price before tax**, and schema.org `Product` + `Offer` JSON-LD. |
+| `/m/{merchantSlug}.md` | Markdown twin of the merchant page: the same facts in few tokens, for agents. |
+| `/m/{merchantSlug}/{productId}.md` | Markdown twin of the product page: list price before tax, description, how to buy. |
 | `/llms.txt` | A plain-text index of the network for LLMs ([llmstxt.org](https://llmstxt.org/) format). |
 | `/m/{merchantSlug}/llms.txt` | The same for one merchant: its products, list prices, how to buy. |
 | `/sitemap.xml` | Every public merchant and product page. |
 | `/robots.txt` | Allows `/m/` and `/llms.txt`; keeps crawlers off `/api/` and `/orders/`; points to the sitemap. |
+
+## Markdown twins
+
+Every merchant and product page has a markdown twin at the same address plus `.md`. There is no content
+negotiation and no user-agent sniffing: a twin is served only at its `.md` address, and the HTML address
+always returns HTML.
+
+- Responses are `Content-Type: text/markdown; charset=utf-8` with `X-Robots-Tag: noindex` (so twins do not
+  compete with the HTML pages in search). A twin is never a redirect, including its 404.
+- The HTML pages advertise their twin twice: a `<link rel="alternate" type="text/markdown" href="…">` in the
+  head, and an HTTP header such as `Link: </m/{slug}.md>; rel="alternate"; type="text/markdown"`
+  (RFC 8288, section 3: a URI-Reference in angle brackets, then parameters; relative references are
+  resolved against the page address). The header is set from `next.config.ts` (`src/lib/twin-config.ts`),
+  so it cannot know whether the page exists: a well-formed but unknown address carries it too, and the
+  404 stays identical to an opted-out merchant's 404.
+- `llms.txt` and `/m/{slug}/llms.txt` link to each twin.
+- Visibility, text cleaning, length limits and the list-price rule are the same as for the HTML pages (a
+  twin reads the same cached functions, never Dodo). Merchant text sits on its own quoted line behind a
+  fixed label; it cannot add headings, links, HTML, code spans or lines.
+- Routing: Next.js dynamic segments match dots, so `/m/{slug}/abc.md` would reach the product page with the
+  id `abc.md`. A `beforeFiles` rewrite in `next.config.ts` sends `.md` addresses to the route handlers under
+  `src/app/twin/` first (and the product page rejects such an id anyway). The internal path `/twin/m/…`
+  returns the same content; it is not advertised anywhere.
 
 ## What is public
 
@@ -63,7 +88,8 @@ shell, which crawlers and LLM fetchers would see) and a missing page is a real 4
 ## Where the code is
 
 - `src/core/public-catalog.ts`: what is public, safe columns only, text cleaning (core, no provider code).
-- `src/core/public-formats.ts`: llms.txt and JSON-LD builders.
+- `src/core/public-formats.ts`: llms.txt and JSON-LD builders. `src/core/public-markdown.ts`: the twin builders.
+- `src/app/twin/`: the twin route handlers. `src/lib/twin-config.ts`: the rewrites and Link headers.
 - `src/app/public-data.ts`: the cached reads. `src/app/m/`: the pages. `src/app/llms.txt/`, `sitemap.ts`, `robots.ts`.
 - `src/lib/public-url.ts`: the base URL for absolute links.
 
@@ -85,6 +111,10 @@ curl.exe -s http://localhost:3000/m/<slug>/<productId>          # contains <scri
 curl.exe http://localhost:3000/llms.txt
 curl.exe http://localhost:3000/m/<slug>/llms.txt
 curl.exe http://localhost:3000/sitemap.xml
+curl.exe -i http://localhost:3000/m/<slug>.md                   # 200, text/markdown; charset=utf-8, x-robots-tag: noindex
+curl.exe -i http://localhost:3000/m/<slug>/<productId>.md       # the product twin
+curl.exe -I http://localhost:3000/m/<slug>                      # HTML, with: link: </m/<slug>.md>; rel="alternate"; type="text/markdown"
+curl.exe -i http://localhost:3000/m/no-such-merchant.md         # 404, same body as any hidden or unknown twin
 curl.exe http://localhost:3000/robots.txt
 curl.exe -i http://localhost:3000/m/no-such-merchant            # 404
 ```

@@ -8,6 +8,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { isPublicSlug } from "@/core/public-catalog";
 import { merchantPath, PRICE_DEPENDS_NOTE } from "@/core/public-formats";
+import { merchantTwinPath } from "@/core/public-markdown";
 import { publicBaseUrl } from "@/lib/public-url";
 import { cachedPublicMerchant, staticMerchantParams } from "@/app/public-data";
 import { MerchantView } from "../views";
@@ -33,7 +34,7 @@ export async function generateMetadata({ params }: PageProps<"/m/[merchantSlug]"
   return {
     title: `${merchant.name} on OpenMoR`,
     description: PRICE_DEPENDS_NOTE,
-    alternates: { canonical: `${base}${merchantPath(merchant.slug)}`, types: { "text/plain": `${base}${merchantPath(merchant.slug)}/llms.txt` } },
+    alternates: { canonical: `${base}${merchantPath(merchant.slug)}`, types: { "text/plain": `${base}${merchantPath(merchant.slug)}/llms.txt`, "text/markdown": `${base}${merchantTwinPath(merchant.slug)}` } },
   };
 }
 
