@@ -128,6 +128,14 @@ export function llmsSafe(text: string): string {
     .trim();
 }
 
+/**
+ * llmsSafe, plus: URLs with any other scheme (javascript://, ftp://, data URLs with //) and bare www.
+ * addresses (some renderers turn those into links) are removed too. For JSON and markdown that agents read.
+ */
+export function plainSafe(text: string): string {
+  return llmsSafe(text.replace(/\b[a-z][a-z0-9+.-]*:\/\/\S*/gi, "(link removed)").replace(/\bwww\.\S+/gi, "(link removed)"));
+}
+
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
 /** /llms.txt: the network index. */

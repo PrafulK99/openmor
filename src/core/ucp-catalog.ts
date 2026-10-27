@@ -13,7 +13,7 @@
 import { z } from "zod";
 import { InvalidInputError } from "@/core/errors";
 import { isPublicProductId, isPublicSlug, type PublicMerchant, type PublicProduct } from "@/core/public-catalog";
-import { describeBilling, llmsSafe, merchantPath, productPath, TAX_NOTE } from "@/core/public-formats";
+import { describeBilling, plainSafe, merchantPath, productPath, TAX_NOTE } from "@/core/public-formats";
 
 export const UCP_VERSION = "2026-08-25";
 export const UCP_SERVICE = "dev.ucp.shopping";
@@ -164,14 +164,14 @@ function entries(catalog: PublicMerchant[]): CatalogEntry[] {
 /**
  * A UCP product with exactly one variant: the product itself, so the product id and the variant id
  * are the same string. The price is the LIST price, before tax. Merchant text is neutralised the same
- * way as in llms.txt: no links, HTML, link syntax or code spans, on one line.
+ * way as in llms.txt (and more): no links of any scheme, HTML, link syntax or code spans, on one line.
  */
 export function toUcpProduct(baseUrl: string, merchant: Pick<PublicMerchant, "slug" | "name">, product: PublicProduct, matched?: string[]) {
   const id = ucpId(merchant.slug, product.id);
   const url = `${baseUrl}${productPath(merchant.slug, product.id)}`;
   const price = { amount: product.listPrice.amountMinor, currency: product.listPrice.currency };
-  const title = llmsSafe(product.name) || "Untitled product";
-  const description = { plain: llmsSafe(product.description ?? product.summary ?? product.name) || title };
+  const title = plainSafe(product.name) || "Untitled product";
+  const description = { plain: plainSafe(product.description ?? product.summary ?? product.name) || title };
   return {
     id,
     title,
@@ -186,7 +186,7 @@ export function toUcpProduct(baseUrl: string, merchant: Pick<PublicMerchant, "sl
         url,
         price,
         availability: { available: true },
-        seller: { name: llmsSafe(merchant.name) || merchant.slug },
+        seller: { name: plainSafe(merchant.name) || merchant.slug },
         ...(matched ? { inputs: matched.map((input) => ({ id: input, match: "exact" })) } : {}),
         metadata: {
           price_basis: "list_price_before_tax",
