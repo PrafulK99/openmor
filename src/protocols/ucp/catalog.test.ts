@@ -33,7 +33,7 @@ const product = (over: Partial<PublicProduct> = {}): PublicProduct => ({
   updatedAt: "2026-01-01T00:00:00.000Z",
   ...over,
 });
-const merchant = (slug: string, name: string, products: PublicProduct[]): PublicMerchant => ({ slug, name, products, updatedAt: "2026-01-01T00:00:00.000Z" });
+const merchant = (slug: string, name: string, products: PublicProduct[]): PublicMerchant => ({ slug, name, isTest: false, products, updatedAt: "2026-01-01T00:00:00.000Z" });
 const catalog = [
   merchant("sharethings", "ShareThings", [product(), product({ id: "pdt_2", name: "Storage", summary: null, description: null, listPrice: { amountMinor: 900, currency: "USD" }, billing: { interval: "month", count: 1 } })]),
   merchant("acme", "Acme", [product({ id: "pdt_9", name: "Acme Suite", listPrice: { amountMinor: 5000, currency: "EUR" } })]),

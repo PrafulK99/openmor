@@ -8,6 +8,7 @@ const base: OrderView = {
   quoteId: "q",
   productId: "p",
   productName: "ShareThings Lifetime",
+  isTest: false,
   status: "pending_payment",
   checkoutMode: "handoff",
   checkoutUrl: "https://checkout",

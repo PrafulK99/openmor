@@ -28,7 +28,7 @@ describe("getProductDetails", () => {
     const d = await getProductDetails(t.deps, { merchantId, productId: p.id });
     expect(d).toEqual({
       productId: p.id,
-      merchant: { id: merchantId, slug: "sharethings", name: "ShareThings" },
+      merchant: { id: merchantId, slug: "sharethings", name: "ShareThings", isTest: false },
       name: "ShareThings Pro",
       description: "Pay once, share forever.",
       price: 500,

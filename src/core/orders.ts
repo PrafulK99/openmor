@@ -1,6 +1,7 @@
 import type { Order, OrderStatus } from "@/generated/prisma/client";
 import { nowFrom, type CoreDeps } from "@/core/deps";
 import type { Payment } from "@/core/types";
+import { isTestMerchant, merchantModeSelect, type MerchantModeFields } from "@/core/visibility";
 
 /**
  * How far an order has progressed. Status only ever moves to a higher rank, so a late or
@@ -34,6 +35,8 @@ export interface OrderView {
   quoteId: string;
   productId: string;
   productName: string;
+  /** The merchant is in test mode: this order is not a real purchase. */
+  isTest: boolean;
   status: OrderStatus;
   checkoutMode: "handoff" | "saved_method";
   checkoutUrl: string | null;
@@ -45,9 +48,12 @@ export interface OrderView {
   createdAt: Date;
 }
 
-const orderInclude = { quote: { include: { product: { select: { id: true, name: true } } } } } as const;
+const orderInclude = {
+  quote: { include: { product: { select: { id: true, name: true } } } },
+  merchant: { select: merchantModeSelect },
+} as const;
 
-type OrderWithProduct = Order & { quote: { product: { id: string; name: string } } };
+type OrderWithProduct = Order & { quote: { product: { id: string; name: string } }; merchant: MerchantModeFields };
 
 export function toOrderView(o: OrderWithProduct): OrderView {
   return {
@@ -56,6 +62,7 @@ export function toOrderView(o: OrderWithProduct): OrderView {
     quoteId: o.quoteId,
     productId: o.quote.product.id,
     productName: o.quote.product.name,
+    isTest: isTestMerchant(o.merchant),
     status: o.status,
     checkoutMode: o.checkoutMode,
     checkoutUrl: o.checkoutUrl,

@@ -192,7 +192,7 @@ describe("what never leaves the catalog", () => {
     expect(out).not.toContain(merchantId);
   });
 
-  it("selects only safe columns from the database", async () => {
+  it("selects only safe columns from the database (the mode flags only to derive isTest)", async () => {
     const merchantSpy = vi.spyOn(t.db.merchant, "findFirst");
     const merchantsSpy = vi.spyOn(t.db.merchant, "findMany");
     await getPublicMerchant(deps, "sharethings");
@@ -201,7 +201,7 @@ describe("what never leaves the catalog", () => {
     const selects = [...merchantSpy.mock.calls, ...merchantsSpy.mock.calls].map(([args]) => Object.keys((args as { select: object }).select));
     expect(selects.length).toBeGreaterThan(0);
     for (const cols of selects) {
-      for (const forbidden of ["dodoApiKeyEncrypted", "dodoWebhookSecretEncrypted", "email", "dodoEnvironment", "liveModeEnabled"]) {
+      for (const forbidden of ["dodoApiKeyEncrypted", "dodoWebhookSecretEncrypted", "email"]) {
         expect(cols).not.toContain(forbidden);
       }
     }

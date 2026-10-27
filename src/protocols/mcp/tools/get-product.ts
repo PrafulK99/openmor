@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { getProductDetails } from "@/core/products";
+import { markTest, TEST_NOTE } from "@/core/visibility";
 import { cadence, money, moneySchema } from "../format";
 import { invalid, ok } from "../results";
 import { defineTool } from "../tool";
@@ -15,6 +16,7 @@ const outputSchema = z.object({
   merchant_name: z.string(),
   product_id: z.string(),
   name: z.string(),
+  is_test: z.boolean().describe("True when the merchant is in test mode: not a real product."),
   description: z.string().nullable(),
   list_price: moneySchema.describe("Base price before tax and currency conversion. Not what the buyer pays."),
   billing_type: z.enum(["one_time", "subscription"]),
@@ -55,13 +57,17 @@ export const getProductTool = defineTool({
     const priceText =
       p.billingType === "subscription" ? `${listPrice.formatted} ${every ?? "per billing period"}` : `${listPrice.formatted} one-time`;
 
+    const name = markTest(p.name, p.merchant.isTest);
+    const summary = `${name} from ${p.merchant.name}: list price ${priceText}, before tax. Call get_quote with the buyer's country for the price they pay.${p.merchant.isTest ? ` ${TEST_NOTE}` : ""}`;
+
     return ok(
       {
         merchant_id: p.merchant.id,
         merchant_slug: p.merchant.slug,
         merchant_name: p.merchant.name,
         product_id: p.productId,
-        name: p.name,
+        name,
+        is_test: p.merchant.isTest,
         description: p.description,
         list_price: listPrice,
         billing_type: p.billingType,
@@ -70,7 +76,7 @@ export const getProductTool = defineTool({
         pay_what_you_want: p.payWhatYouWant,
         fulfillment: { license_keys: p.licenseKeys, credits: p.credits, entitlement_types: p.entitlementTypes },
       },
-      `${p.name} from ${p.merchant.name}: list price ${priceText}, before tax. Call get_quote with the buyer's country for the price they pay.`,
+      summary,
     );
   },
 });

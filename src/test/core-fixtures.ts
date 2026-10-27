@@ -28,6 +28,9 @@ export function seedMerchant(db: FakeDb, overrides: Record<string, unknown> = {}
     email: "owner@sharethings.test",
     dodoApiKeyEncrypted: encrypt("dodo_test_sk_seed", TEST_ENCRYPTION_KEY),
     networkOptIn: true,
+    // Live by default: a test-mode merchant is hidden unless the deployment includes them. Tests of test mode override these.
+    dodoEnvironment: "live_mode",
+    liveModeEnabled: true,
     ...overrides,
   }) as { id: string };
 }

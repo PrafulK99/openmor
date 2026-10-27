@@ -10,9 +10,16 @@ const envSchema = z.object({
     }),
   DODO_ENVIRONMENT: z.enum(["test_mode", "live_mode"]).default("test_mode"),
   APP_URL: z.url(),
+  // Show merchants that are in test mode on every public surface. Off unless exactly "true".
+  PUBLIC_INCLUDE_TEST_MERCHANTS: z.enum(["true", "false"]).optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;
+
+/** True only when PUBLIC_INCLUDE_TEST_MERCHANTS is exactly "true". Anything else, including a typo, keeps test merchants hidden. */
+export function includeTestMerchants(source: Record<string, string | undefined> = process.env): boolean {
+  return source.PUBLIC_INCLUDE_TEST_MERCHANTS === "true";
+}
 
 let cached: Env | undefined;
 

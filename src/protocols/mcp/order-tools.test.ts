@@ -57,6 +57,7 @@ describe("checkout tool", () => {
       status: "pending_payment",
       checkout_url: "https://test.checkout.dodopayments.com/session/cks_1",
       product_name: "ShareThings Lifetime",
+      is_test: false,
       amount_due: { amount_minor: 5195, currency: "EUR", formatted: "€51.95" },
       is_new_order: true,
     });

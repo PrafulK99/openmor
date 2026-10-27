@@ -1,6 +1,7 @@
 // Read-only views of the public catalog, for the agent-readable pages (/m/..., llms.txt, sitemap).
 //
-// What is public: merchants that opted in to the network, and their products that are marked
+// What is public: merchants that opted in to the network and are visible (live mode, or test mode when
+// the deployment includes test merchants: see visibility.ts), and their products that are marked
 // agent-sellable and still active. Nothing else is ever returned, whether it exists or not.
 // What is never returned: merchant keys or ids, provider ids, buyer data, raw provider data.
 // Everything here is read from our own database (filled by catalog sync); no provider is called.
@@ -9,8 +10,9 @@ import { formatMoney } from "@/core/money";
 import { parseProductExtras } from "@/core/products";
 import { limitText } from "@/core/text";
 import type { BillingPeriod } from "@/core/types";
+import { isTestMerchant, merchantModeSelect, visibleMerchantWhere } from "@/core/visibility";
 
-export type PublicDeps = Pick<CoreDeps, "db">;
+export type PublicDeps = Pick<CoreDeps, "db" | "includeTestMerchants">;
 
 /** Length limits for merchant-written text on public pages. It is data, so it is capped. */
 export const PUBLIC_LIMITS = { merchantName: 100, productName: 120, summary: 240, description: 800 } as const;
@@ -65,18 +67,21 @@ export interface PublicProduct {
 export interface PublicMerchant {
   slug: string;
   name: string;
+  /** The merchant is in test mode. Only possible when the deployment includes test merchants. */
+  isTest: boolean;
   products: PublicProduct[];
   updatedAt: string;
 }
 
 export interface PublicProductPage {
-  merchant: { slug: string; name: string };
+  merchant: { slug: string; name: string; isTest: boolean };
   product: PublicProduct;
 }
 
 export interface PublicIndexMerchant {
   slug: string;
   name: string;
+  isTest: boolean;
   products: { id: string; name: string; updatedAt: string }[];
   updatedAt: string;
 }
@@ -121,9 +126,9 @@ function toPublicProduct(p: ProductRow): PublicProduct {
 async function findPublicMerchant(deps: PublicDeps, slug: string) {
   if (!isPublicSlug(slug)) return null;
   return deps.db.merchant.findFirst({
-    where: { slug, networkOptIn: true },
-    // Safe columns only: never the encrypted key, webhook secret, email or flags.
-    select: { id: true, slug: true, name: true, updatedAt: true },
+    where: { slug, ...visibleMerchantWhere(deps) },
+    // Safe columns only: never the encrypted key, webhook secret or email. The mode flags are read only to derive isTest.
+    select: { id: true, slug: true, name: true, updatedAt: true, ...merchantModeSelect },
   });
 }
 
@@ -139,7 +144,7 @@ export async function getPublicMerchant(deps: PublicDeps, slug: string): Promise
   });
   const products = rows.map(toPublicProduct);
   const latest = products.reduce((max, p) => (p.updatedAt > max ? p.updatedAt : max), merchant.updatedAt.toISOString());
-  return { slug: merchant.slug, name: publicText(merchant.name, PUBLIC_LIMITS.merchantName) ?? merchant.slug, products, updatedAt: latest };
+  return { slug: merchant.slug, name: publicText(merchant.name, PUBLIC_LIMITS.merchantName) ?? merchant.slug, isTest: isTestMerchant(merchant), products, updatedAt: latest };
 }
 
 /** A product page. Null unless the merchant is public AND this product is that merchant's sellable product. */
@@ -153,7 +158,7 @@ export async function getPublicProduct(deps: PublicDeps, slug: string, productId
   });
   if (!row) return null;
   return {
-    merchant: { slug: merchant.slug, name: publicText(merchant.name, PUBLIC_LIMITS.merchantName) ?? merchant.slug },
+    merchant: { slug: merchant.slug, name: publicText(merchant.name, PUBLIC_LIMITS.merchantName) ?? merchant.slug, isTest: isTestMerchant(merchant) },
     product: toPublicProduct(row),
   };
 }
@@ -161,8 +166,8 @@ export async function getPublicProduct(deps: PublicDeps, slug: string, productId
 /** Everything public, in one light read: for the network llms.txt, the sitemap and static params. */
 export async function getPublicIndex(deps: PublicDeps): Promise<PublicIndexMerchant[]> {
   const merchants = await deps.db.merchant.findMany({
-    where: { networkOptIn: true },
-    select: { id: true, slug: true, name: true, updatedAt: true },
+    where: visibleMerchantWhere(deps),
+    select: { id: true, slug: true, name: true, updatedAt: true, ...merchantModeSelect },
     orderBy: { name: "asc" },
     take: MAX_PUBLIC_MERCHANTS,
   });
@@ -178,7 +183,7 @@ export async function getPublicIndex(deps: PublicDeps): Promise<PublicIndexMerch
       .slice(0, MAX_PRODUCTS_PER_MERCHANT)
       .map((r) => ({ id: r.id, name: publicText(r.name, PUBLIC_LIMITS.productName) ?? "Untitled product", updatedAt: r.syncedAt.toISOString() }));
     const latest = products.reduce((max, p) => (p.updatedAt > max ? p.updatedAt : max), m.updatedAt.toISOString());
-    return { slug: m.slug, name: publicText(m.name, PUBLIC_LIMITS.merchantName) ?? m.slug, products, updatedAt: latest };
+    return { slug: m.slug, name: publicText(m.name, PUBLIC_LIMITS.merchantName) ?? m.slug, isTest: isTestMerchant(m), products, updatedAt: latest };
   });
 }
 
@@ -192,8 +197,8 @@ export const MAX_CATALOG_PRODUCTS = 5000;
  */
 export async function getPublicCatalog(deps: PublicDeps): Promise<PublicMerchant[]> {
   const merchants = await deps.db.merchant.findMany({
-    where: { networkOptIn: true },
-    select: { id: true, slug: true, name: true, updatedAt: true },
+    where: visibleMerchantWhere(deps),
+    select: { id: true, slug: true, name: true, updatedAt: true, ...merchantModeSelect },
     orderBy: { name: "asc" },
     take: MAX_PUBLIC_MERCHANTS,
   });
@@ -209,7 +214,7 @@ export async function getPublicCatalog(deps: PublicDeps): Promise<PublicMerchant
     .map((m) => {
       const products = rows.filter((r) => r.merchantId === m.id).slice(0, MAX_PRODUCTS_PER_MERCHANT).map(toPublicProduct);
       const latest = products.reduce((max, p) => (p.updatedAt > max ? p.updatedAt : max), m.updatedAt.toISOString());
-      return { slug: m.slug, name: publicText(m.name, PUBLIC_LIMITS.merchantName) ?? m.slug, products, updatedAt: latest };
+      return { slug: m.slug, name: publicText(m.name, PUBLIC_LIMITS.merchantName) ?? m.slug, isTest: isTestMerchant(m), products, updatedAt: latest };
     });
 }
 

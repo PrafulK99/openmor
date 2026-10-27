@@ -18,6 +18,12 @@ describe("parseEnv", () => {
     ).toThrow(/ENCRYPTION_KEY/);
   });
 
+  it("accepts only true or false for PUBLIC_INCLUDE_TEST_MERCHANTS, and leaves it unset by default", () => {
+    expect(parseEnv(valid).PUBLIC_INCLUDE_TEST_MERCHANTS).toBeUndefined();
+    expect(parseEnv({ ...valid, PUBLIC_INCLUDE_TEST_MERCHANTS: "true" }).PUBLIC_INCLUDE_TEST_MERCHANTS).toBe("true");
+    expect(() => parseEnv({ ...valid, PUBLIC_INCLUDE_TEST_MERCHANTS: "yes" })).toThrow(/PUBLIC_INCLUDE_TEST_MERCHANTS/);
+  });
+
   it("rejects an unknown Dodo environment", () => {
     expect(() => parseEnv({ ...valid, DODO_ENVIRONMENT: "prod" })).toThrow(/DODO_ENVIRONMENT/);
   });

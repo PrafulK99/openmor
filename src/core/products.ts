@@ -3,6 +3,7 @@ import type { Merchant, Product as ProductRow } from "@/generated/prisma/client"
 import type { CoreDeps } from "@/core/deps";
 import { OpenMorError } from "@/core/errors";
 import type { BillingPeriod } from "@/core/types";
+import { isMerchantVisible, isTestMerchant } from "@/core/visibility";
 
 /**
  * Load a merchant and product that agents may buy from: merchant in the network,
@@ -15,7 +16,7 @@ export async function loadSellable(
   productId: string,
 ): Promise<{ merchant: Merchant; product: ProductRow }> {
   const merchant = await deps.db.merchant.findUnique({ where: { id: merchantId } });
-  if (!merchant || !merchant.networkOptIn) {
+  if (!merchant || !isMerchantVisible(deps, merchant)) {
     throw new OpenMorError("MERCHANT_NOT_FOUND", `No merchant "${merchantId}" in the network`);
   }
   const product = await deps.db.product.findUnique({ where: { id: productId } });
@@ -27,7 +28,7 @@ export async function loadSellable(
 
 export interface ProductDetails {
   productId: string;
-  merchant: { id: string; slug: string; name: string };
+  merchant: { id: string; slug: string; name: string; isTest: boolean };
   name: string;
   description: string | null;
   /** List price before tax, in minor units of `currency`. A quote gives the real total. */
@@ -74,7 +75,7 @@ export async function getProductDetails(
   const extra = parseProductExtras(product.providerData);
   return {
     productId: product.id,
-    merchant: { id: merchant.id, slug: merchant.slug, name: merchant.name },
+    merchant: { id: merchant.id, slug: merchant.slug, name: merchant.name, isTest: isTestMerchant(merchant) },
     name: product.name,
     description: product.description,
     price: product.priceAmount,

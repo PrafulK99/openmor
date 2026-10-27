@@ -25,6 +25,7 @@ const row = {
   createdAt: new Date(),
   updatedAt: new Date(),
   quote: { product: { id: "p", name: "ShareThings Lifetime" } },
+  merchant: { dodoEnvironment: "live_mode" as const, liveModeEnabled: true },
 };
 
 describe("toOrderView", () => {
