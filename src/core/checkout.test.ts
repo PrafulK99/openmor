@@ -50,6 +50,14 @@ describe("createCheckout", () => {
     expect(t.db.tables.quote[0]!.status).toBe("used");
   });
 
+  it("checks out a quote that has an old-style id", async () => {
+    const legacyId = "cm0legacyquoteid0000000001";
+    t.db.tables.quote.find((row) => row.id === quoteId)!.id = legacyId;
+    const { order, created } = await createCheckout(deps, { quoteId: legacyId, buyerEmail: "buyer@example.com" });
+    expect(created).toBe(true);
+    expect(order.quoteId).toBe(legacyId);
+  });
+
   it("is idempotent: a repeat with the same quote and email returns the same order and URL", async () => {
     const first = await createCheckout(deps, { quoteId, buyerEmail: "buyer@example.com" });
     const again = await createCheckout(deps, { quoteId, buyerEmail: "BUYER@example.com" });
