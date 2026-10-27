@@ -3,10 +3,19 @@
 // one of our own sentences, and never in an attribute or a link.
 import Link from "next/link";
 import { formatListPrice, type PublicMerchant, type PublicProductPage } from "@/core/public-catalog";
+import { TEST_NOTE } from "@/core/visibility";
 import { connectorUrl, describeBilling, merchantPath, PRICE_DEPENDS_NOTE, productJsonLd, productPath, safeJsonLd, TAX_NOTE } from "@/core/public-formats";
 
 const page = { padding: "2rem", fontFamily: "system-ui, sans-serif", maxWidth: "44rem", margin: "0 auto", lineHeight: 1.5 } as const;
 const muted = { color: "#555" } as const;
+
+function TestBanner() {
+  return (
+    <p role="note" style={{ border: "2px solid #b45309", background: "#fffbeb", padding: "0.75rem 1rem" }}>
+      <strong>{TEST_NOTE}</strong>
+    </p>
+  );
+}
 
 function HowToConnect({ baseUrl, slug }: { baseUrl: string; slug: string }) {
   return (
@@ -33,6 +42,7 @@ function HowToConnect({ baseUrl, slug }: { baseUrl: string; slug: string }) {
 export function MerchantView({ merchant, baseUrl }: { merchant: PublicMerchant; baseUrl: string }) {
   return (
     <main style={page}>
+      {merchant.isTest ? <TestBanner /> : null}
       <h1>{merchant.name}</h1>
       <p>Digital products that AI agents can buy through OpenMoR.</p>
       <p>
@@ -67,6 +77,7 @@ export function ProductView({ data, baseUrl }: { data: PublicProductPage; baseUr
   const { merchant, product } = data;
   return (
     <main style={page}>
+      {merchant.isTest ? <TestBanner /> : null}
       <p style={muted}>
         <Link href={merchantPath(merchant.slug)} prefetch={false}>
           {merchant.name}

@@ -29,6 +29,8 @@ export async function generateMetadata({ params }: PageProps<"/m/[merchantSlug]/
   return {
     title: `${data.product.name} · ${data.merchant.name} on OpenMoR`,
     description: data.product.summary ?? undefined,
+    // A test merchant is never indexed.
+    ...(data.merchant.isTest ? { robots: { index: false, follow: false } } : {}),
     alternates: { canonical: `${base}${productPath(data.merchant.slug, data.product.id)}`, types: { "text/plain": `${base}${merchantPath(data.merchant.slug)}/llms.txt`, "text/markdown": `${base}${productTwinPath(data.merchant.slug, data.product.id)}` } },
   };
 }

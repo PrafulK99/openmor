@@ -6,6 +6,7 @@
 //  2. Merchant text is data. It is cleaned, length-limited, put in its own quoted line behind a fixed
 //     label, and can never add a heading, a link, HTML, a code span or a new line.
 import { formatListPrice, type PublicMerchant, type PublicProductPage } from "@/core/public-catalog";
+import { TEST_NOTE } from "@/core/visibility";
 import { connectorUrl, describeBilling, merchantPath, plainSafe, productPath, TAX_NOTE } from "@/core/public-formats";
 
 /** The twin's address is the page's address plus ".md". */
@@ -53,6 +54,7 @@ export function buildMerchantMarkdown(input: { baseUrl: string; merchant: Public
     "",
     "> Digital products from this merchant that AI agents can buy through OpenMoR.",
     "",
+    ...(merchant.isTest ? [`> ${TEST_NOTE}`, ""] : []),
     TAX_NOTE,
     MERCHANT_TEXT_NOTE,
     "",
@@ -82,6 +84,7 @@ export function buildProductMarkdown(input: { baseUrl: string; data: PublicProdu
     "",
     `> A digital product from [${markdownSafe(merchant.name)}](${baseUrl}${merchantTwinPath(merchant.slug)}), sold through OpenMoR.`,
     "",
+    ...(merchant.isTest ? [`> ${TEST_NOTE}`, ""] : []),
     "## List price",
     "",
     listPriceLine(product),

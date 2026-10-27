@@ -34,6 +34,8 @@ export async function generateMetadata({ params }: PageProps<"/m/[merchantSlug]"
   return {
     title: `${merchant.name} on OpenMoR`,
     description: PRICE_DEPENDS_NOTE,
+    // A test merchant is never indexed.
+    ...(merchant.isTest ? { robots: { index: false, follow: false } } : {}),
     alternates: { canonical: `${base}${merchantPath(merchant.slug)}`, types: { "text/plain": `${base}${merchantPath(merchant.slug)}/llms.txt`, "text/markdown": `${base}${merchantTwinPath(merchant.slug)}` } },
   };
 }
