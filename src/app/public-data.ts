@@ -12,6 +12,7 @@ import { cacheLife, cacheTag } from "next/cache";
 import { connection } from "next/server";
 import { getPublicIndex, getPublicMerchant, getPublicProduct, isPublicSlug } from "@/core/public-catalog";
 import { buildMerchantLlmsTxt, buildNetworkLlmsTxt } from "@/core/public-formats";
+import { buildMerchantMarkdown, buildProductMarkdown } from "@/core/public-markdown";
 import { publicBaseUrl } from "@/lib/public-url";
 
 /** Served from cache for 5 minutes, refreshed in the background after 15, dropped after a day. */
@@ -111,4 +112,22 @@ export async function staticProductParams(): Promise<{ merchantSlug: string; pro
     // No database at build time: fall through.
   }
   return [{ merchantSlug: PLACEHOLDER, productId: PLACEHOLDER }];
+}
+
+/** /m/{slug}.md as text, or null when there is no such public merchant. */
+export async function cachedMerchantMarkdown(slug: string): Promise<string | null> {
+  "use cache";
+  cacheLife(CATALOG_LIFE);
+  cacheTag("public-catalog", `public-merchant:${slug}`);
+  const merchant = await getPublicMerchant(await publicDeps(), slug);
+  return merchant ? buildMerchantMarkdown({ baseUrl: publicBaseUrl(), merchant }) : null;
+}
+
+/** /m/{slug}/{productId}.md as text, or null when there is no such public product. */
+export async function cachedProductMarkdown(slug: string, productId: string): Promise<string | null> {
+  "use cache";
+  cacheLife(CATALOG_LIFE);
+  cacheTag("public-catalog", `public-merchant:${slug}`);
+  const data = await getPublicProduct(await publicDeps(), slug, productId);
+  return data ? buildProductMarkdown({ baseUrl: publicBaseUrl(), data }) : null;
 }

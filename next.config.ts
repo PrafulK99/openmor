@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { TWIN_LINK_HEADERS, TWIN_REWRITES } from "./src/lib/twin-config";
 
 const isDev = process.env.NODE_ENV === "development";
 
@@ -37,8 +38,14 @@ const nextConfig: NextConfig = {
       ignore: [/\/orders\//],
     },
   },
+  // Markdown twins: /m/{slug}.md and /m/{slug}/{productId}.md are served by the route handlers under
+  // /twin. Without this rewrite the dynamic [productId] page would receive "abc.md" as an id (a
+  // dynamic segment matches dots). beforeFiles runs before the page routes are tried.
+  async rewrites() {
+    return { beforeFiles: [...TWIN_REWRITES], afterFiles: [], fallback: [] };
+  },
   async headers() {
-    return [{ source: "/:path*", headers: securityHeaders }];
+    return [{ source: "/:path*", headers: securityHeaders }, ...TWIN_LINK_HEADERS.map((r) => ({ source: r.source, headers: [...r.headers] }))];
   },
 };
 
