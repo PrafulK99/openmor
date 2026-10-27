@@ -65,7 +65,8 @@ UCP catalog, and the MCP tools `search_products`, `get_product`, `get_quote` and
     `get_order`, an `is_test` field, and the sentence "TEST CATALOG: ..." in their summaries;
   - a banner on the merchant and product pages and on the markdown twins;
   - a line in `/llms.txt` and in the merchant's `llms.txt`;
-  - in the UCP catalog, `metadata.test_catalog: true` on the variant and a `test_catalog` info message.
+  - in the UCP catalog, `[TEST]` in front of the product and variant titles, `metadata.test_catalog: true`
+    on the variant, and a `test_catalog` info message.
 - Test merchants' pages are `noindex` (page metadata; twins always send `X-Robots-Tag: noindex`) and are
   **left out of `sitemap.xml`**.
 - The flag accepts only `true` or `false`; anything else stops the server from starting. Only the exact

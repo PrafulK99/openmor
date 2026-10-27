@@ -13,7 +13,7 @@
 import { z } from "zod";
 import { InvalidInputError } from "@/core/errors";
 import { isPublicProductId, isPublicSlug, type PublicMerchant, type PublicProduct } from "@/core/public-catalog";
-import { TEST_NOTE } from "@/core/visibility";
+import { markTest, TEST_NOTE } from "@/core/visibility";
 import { describeBilling, plainSafe, merchantPath, productPath, TAX_NOTE } from "@/core/public-formats";
 
 export const UCP_VERSION = "2026-08-25";
@@ -171,8 +171,10 @@ export function toUcpProduct(baseUrl: string, merchant: Pick<PublicMerchant, "sl
   const id = ucpId(merchant.slug, product.id);
   const url = `${baseUrl}${productPath(merchant.slug, product.id)}`;
   const price = { amount: product.listPrice.amountMinor, currency: product.listPrice.currency };
-  const title = plainSafe(product.name) || "Untitled product";
-  const description = { plain: plainSafe(product.description ?? product.summary ?? product.name) || title };
+  const name = plainSafe(product.name) || "Untitled product";
+  // A test merchant's titles start with the fixed [TEST] marker (the product and its variant share the title).
+  const title = markTest(name, merchant.isTest);
+  const description = { plain: plainSafe(product.description ?? product.summary ?? product.name) || name };
   return {
     id,
     title,

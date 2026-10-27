@@ -273,3 +273,17 @@ describe("strict validation", () => {
     ).not.toThrow();
   });
 });
+
+describe("test merchants", () => {
+  it("prefixes the fixed [TEST] marker on product and variant titles, not on live ones or on descriptions", () => {
+    const mixed = [{ ...catalog[0]!, isTest: true }, catalog[1]!];
+    const res = searchCatalog({ baseUrl: BASE, catalog: mixed, request: parseUcpRequest(searchRequestSchema, { query: "" }) });
+    const sharethings = res.products.find((p) => p.id.startsWith("sharethings~"))!;
+    expect(sharethings.title).toBe("[TEST] Lifetime");
+    expect(sharethings.variants[0]!.title).toBe("[TEST] Lifetime");
+    expect(sharethings.description.plain).not.toContain("[TEST]");
+    const acme = res.products.find((p) => p.id.startsWith("acme~"))!;
+    expect(acme.title).toBe("Acme Suite");
+    expect(acme.variants[0]!.title).toBe("Acme Suite");
+  });
+});

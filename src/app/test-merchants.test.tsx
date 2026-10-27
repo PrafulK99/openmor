@@ -3,7 +3,7 @@
 // fixed strings, noindex, and left out of the sitemap. A hidden merchant looks exactly like an unknown one.
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { TEST_NOTE } from "@/core/visibility";
+import { TEST_MARKER, TEST_NOTE } from "@/core/visibility";
 import { seedMerchant, seedProduct, setup } from "@/test/core-fixtures";
 import { GET as networkLlms } from "./llms.txt/route";
 import { GET as merchantLlms } from "./m/[merchantSlug]/llms.txt/route";
@@ -155,6 +155,8 @@ describe("flag on: test merchants appear, marked everywhere, and are not indexab
       messages: { code: string; content: string }[];
     };
     const byId = Object.fromEntries(res.products.map((p) => [p.id, p]));
+    expect(byId[`tester~${testProductId}`]).toMatchObject({ title: `${TEST_MARKER} Tester Pro`, variants: [{ title: `${TEST_MARKER} Tester Pro` }] });
+    expect(byId[`liveco~${liveProductId}`]).toMatchObject({ title: "LiveCo Pro", variants: [{ title: "LiveCo Pro" }] });
     expect(byId[`tester~${testProductId}`]!.variants[0]!.metadata.test_catalog).toBe(true);
     expect(byId[`liveco~${liveProductId}`]!.variants[0]!.metadata).not.toHaveProperty("test_catalog");
     expect(res.messages.find((m) => m.code === "test_catalog")?.content).toBe(TEST_NOTE);
@@ -162,10 +164,12 @@ describe("flag on: test merchants appear, marked everywhere, and are not indexab
     const liveOnly = (await (await post(ucpSearch, { query: "LiveCo" })).json()) as { messages: { code: string }[] };
     expect(liveOnly.messages.map((m) => m.code)).not.toContain("test_catalog");
 
-    const one = (await (await post(ucpProduct, { id: `tester~${testProductId}` })).json()) as { messages: { code: string }[]; product: { variants: { metadata: Record<string, unknown> }[] } };
+    const one = (await (await post(ucpProduct, { id: `tester~${testProductId}` })).json()) as { messages: { code: string }[]; product: { title: string; variants: { metadata: Record<string, unknown> }[] } };
+    expect(one.product).toMatchObject({ title: `${TEST_MARKER} Tester Pro`, variants: [{ title: `${TEST_MARKER} Tester Pro` }] });
     expect(one.product.variants[0]!.metadata.test_catalog).toBe(true);
     expect(one.messages.map((m) => m.code)).toContain("test_catalog");
-    const looked = (await (await post(ucpLookup, { ids: [`tester~${testProductId}`] })).json()) as { messages: { code: string }[] };
+    const looked = (await (await post(ucpLookup, { ids: [`tester~${testProductId}`] })).json()) as { messages: { code: string }[]; products: { title: string }[] };
+    expect(looked.products[0]!.title).toBe(`${TEST_MARKER} Tester Pro`);
     expect(looked.messages.map((m) => m.code)).toContain("test_catalog");
   });
 
