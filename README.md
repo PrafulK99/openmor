@@ -83,7 +83,7 @@ src/
 - **Merchant text is data:** length-limited, escaped, and never placed in links or instructions ([docs/public-pages.md](docs/public-pages.md#merchant-text-is-data)).
 - Security headers (including a Content-Security-Policy) are set on every route.
 
-More: [docs/](docs/). Report vulnerabilities privately as described in [SECURITY.md](SECURITY.md), not in public issues.
+The full threat model, with where each control lives in the code and what risk remains, is in [docs/threat-model.md](docs/threat-model.md). More: [docs/](docs/). Report vulnerabilities privately as described in [SECURITY.md](SECURITY.md), not in public issues.
 
 ## What it can't do yet
 

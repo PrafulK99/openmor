@@ -2,6 +2,8 @@
 
 OpenMoR handles merchant API keys and sits in front of a payments flow, so security reports are welcome and taken seriously.
 
+Before reporting, you may want to read the [threat model](docs/threat-model.md): it lists what is defended, how, and the known limits.
+
 ## Supported versions
 
 Only the `main` branch (and what is deployed from it) is supported. There are no other maintained versions.
