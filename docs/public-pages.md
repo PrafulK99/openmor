@@ -11,6 +11,7 @@ agent (or a search engine, or a person) can see what is for sale without using t
 | `/m/{merchantSlug}/{productId}.md` | Markdown twin of the product page: list price before tax, description, how to buy. |
 | `/llms.txt` | A plain-text index of the network for LLMs ([llmstxt.org](https://llmstxt.org/) format). |
 | `/m/{merchantSlug}/llms.txt` | The same for one merchant: its products, list prices, how to buy. |
+| `/.well-known/ucp`, `/ucp/catalog/*` | UCP profile and read-only catalog for agents: see [ucp-acp.md](ucp-acp.md). |
 | `/sitemap.xml` | Every public merchant and product page. |
 | `/robots.txt` | Allows `/m/` and `/llms.txt`; keeps crawlers off `/api/` and `/orders/`; points to the sitemap. |
 

@@ -182,6 +182,37 @@ export async function getPublicIndex(deps: PublicDeps): Promise<PublicIndexMerch
   });
 }
 
+/** Most products one UCP catalog read returns: the catalog is searched in memory, so it is capped. */
+export const MAX_CATALOG_PRODUCTS = 5000;
+
+/**
+ * Every public merchant with its sellable products, in one read: for the UCP catalog, which searches
+ * the whole network. Same visibility rules as the pages (opted-in merchants, agent-sellable active
+ * products), safe columns only, capped at MAX_CATALOG_PRODUCTS.
+ */
+export async function getPublicCatalog(deps: PublicDeps): Promise<PublicMerchant[]> {
+  const merchants = await deps.db.merchant.findMany({
+    where: { networkOptIn: true },
+    select: { id: true, slug: true, name: true, updatedAt: true },
+    orderBy: { name: "asc" },
+    take: MAX_PUBLIC_MERCHANTS,
+  });
+  if (merchants.length === 0) return [];
+  const rows = await deps.db.product.findMany({
+    where: { merchantId: { in: merchants.map((m) => m.id) }, agentSellable: true, active: true },
+    select: { ...productSelect, merchantId: true },
+    orderBy: { name: "asc" },
+    take: MAX_CATALOG_PRODUCTS,
+  });
+  return merchants
+    .filter((m) => isPublicSlug(m.slug))
+    .map((m) => {
+      const products = rows.filter((r) => r.merchantId === m.id).slice(0, MAX_PRODUCTS_PER_MERCHANT).map(toPublicProduct);
+      const latest = products.reduce((max, p) => (p.updatedAt > max ? p.updatedAt : max), m.updatedAt.toISOString());
+      return { slug: m.slug, name: publicText(m.name, PUBLIC_LIMITS.merchantName) ?? m.slug, products, updatedAt: latest };
+    });
+}
+
 /** "$49.00" for display: the list price with its own currency, before tax. */
 export function formatListPrice(price: { amountMinor: number; currency: string }): string {
   return formatMoney(price.amountMinor, price.currency);
