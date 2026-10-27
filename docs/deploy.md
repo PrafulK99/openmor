@@ -109,6 +109,21 @@ Also confirm the security headers are present (on any route):
 curl -sI https://<APP_URL host>/ | grep -iE "content-security-policy|x-frame-options|x-content-type-options|referrer-policy"
 ```
 
+## Rate limiting
+
+The app has no rate limiter of its own. The public, unauthenticated endpoints are limited by a **Vercel Firewall rule**, configured in the Vercel dashboard (**Project → Firewall → Configure → Custom Rules**), not in code or `vercel.json`:
+
+| Setting | Value |
+| --- | --- |
+| Match | Request path **equals** `/api/mcp` **or** request path **starts with** `/ucp/` |
+| Rate limit | Fixed window, 60 s |
+| Limit | 100 requests per IP |
+| Action | 429 (Too Many Requests) |
+
+- The Hobby plan allows **one** rate-limit rule, so both paths share this one rule (and one counter per IP).
+- `/api/webhooks/dodo/...` and `/api/health` are **deliberately excluded**. Webhooks come from Dodo, not from buyers or agents, and a throttled webhook is a lost payment update; the health check must keep answering.
+- If the rule is lost (a new Vercel project, a plan change), re-create it from this table. `/.well-known/ucp` and the `/m/...` pages are cached and not covered.
+
 ## Logging and secrets
 
 - App code logs almost nothing. The only log line is a failed webhook, with the merchant id and error class name. A lint rule (`no-console`) blocks new logging without a reviewed exception.
