@@ -1,4 +1,4 @@
-// UCP (Universal Commerce Protocol) front door: the network profile and the read-only catalog.
+// UCP (Universal Commerce Protocol) front door (protocol layer: it calls core only): the network profile and the read-only catalog.
 // Spec: https://ucp.dev/2026-08-25/specification/overview and .../shopping/catalog (version 2026-08-25).
 //
 // What OpenMoR honestly offers through UCP is DISCOVERY ONLY: search and lookup of the agent-sellable

@@ -1,6 +1,6 @@
 // /.well-known/ucp: the UCP business profile for the OpenMoR network. Public, no redirects.
 // Cache-Control is public with max-age 300, and the ETag lets clients revalidate (304).
-import { buildUcpProfile } from "@/core/ucp-catalog";
+import { buildUcpProfile } from "@/protocols/ucp/catalog";
 import { publicBaseUrl } from "@/lib/public-url";
 import { etagOf } from "../../ucp-http";
 

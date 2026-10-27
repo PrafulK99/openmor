@@ -18,7 +18,7 @@ import {
   UCP_LIMITS,
   UCP_VERSION,
   ucpId,
-} from "@/core/ucp-catalog";
+} from "@/protocols/ucp/catalog";
 
 const BASE = "https://openmor.example.com";
 

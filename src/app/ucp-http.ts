@@ -4,7 +4,7 @@
 import { createHash } from "node:crypto";
 import type { ZodType, infer as zInfer } from "zod";
 import { InvalidInputError } from "@/core/errors";
-import { UCP_LIMITS, ucpError } from "@/core/ucp-catalog";
+import { UCP_LIMITS, ucpError } from "@/protocols/ucp/catalog";
 
 const JSON_TYPE = "application/json; charset=utf-8";
 

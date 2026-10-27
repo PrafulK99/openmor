@@ -3,7 +3,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { seedMerchant, seedProduct, setup } from "@/test/core-fixtures";
 import { GET as profile } from "../.well-known/ucp/route";
-import { UCP_CAPABILITIES, UCP_LIMITS, UCP_VERSION } from "@/core/ucp-catalog";
+import { UCP_CAPABILITIES, UCP_LIMITS, UCP_VERSION } from "@/protocols/ucp/catalog";
 import { POST as lookup } from "./catalog/lookup/route";
 import { POST as product } from "./catalog/product/route";
 import { POST as search } from "./catalog/search/route";

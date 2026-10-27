@@ -1,5 +1,5 @@
 // POST /ucp/catalog/search: UCP catalog (search). Read-only, from the cached public catalog; never calls Dodo.
-import { CAP_SEARCH, searchCatalog, searchRequestSchema } from "@/core/ucp-catalog";
+import { CAP_SEARCH, searchCatalog, searchRequestSchema } from "@/protocols/ucp/catalog";
 import { publicBaseUrl } from "@/lib/public-url";
 import { cachedPublicCatalog } from "../../../public-data";
 import { handleCatalogRequest } from "../../../ucp-http";

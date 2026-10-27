@@ -1,5 +1,5 @@
 // POST /ucp/catalog/lookup: UCP catalog (lookup). Read-only, from the cached public catalog; never calls Dodo.
-import { CAP_LOOKUP, lookupCatalog, lookupRequestSchema } from "@/core/ucp-catalog";
+import { CAP_LOOKUP, lookupCatalog, lookupRequestSchema } from "@/protocols/ucp/catalog";
 import { publicBaseUrl } from "@/lib/public-url";
 import { cachedPublicCatalog } from "../../../public-data";
 import { handleCatalogRequest } from "../../../ucp-http";
