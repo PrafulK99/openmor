@@ -4,7 +4,7 @@ about: Suggest an improvement or a new capability
 title: "feat: "
 ---
 
-> **Security issue?** Do not open a public issue. Follow [SECURITY.md](../../SECURITY.md).
+> **Security issue?** Do not open a public issue. Follow [the security policy](https://github.com/PrafulK99/openmor/security/policy).
 
 ## The problem
 

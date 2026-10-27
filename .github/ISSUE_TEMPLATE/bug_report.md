@@ -4,7 +4,7 @@ about: Something does not work as documented
 title: "bug: "
 ---
 
-> **Security issue?** Do not open a public issue. Follow [SECURITY.md](../../SECURITY.md).
+> **Security issue?** Do not open a public issue. Follow [the security policy](https://github.com/PrafulK99/openmor/security/policy).
 > **Never paste API keys, webhook secrets, licence keys, portal links or buyer data.**
 
 ## What happened
