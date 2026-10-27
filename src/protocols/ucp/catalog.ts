@@ -13,6 +13,7 @@
 import { z } from "zod";
 import { InvalidInputError } from "@/core/errors";
 import { isPublicProductId, isPublicSlug, type PublicMerchant, type PublicProduct } from "@/core/public-catalog";
+import { markTest, TEST_NOTE } from "@/core/visibility";
 import { describeBilling, plainSafe, merchantPath, productPath, TAX_NOTE } from "@/core/public-formats";
 
 export const UCP_VERSION = "2026-08-25";
@@ -166,12 +167,14 @@ function entries(catalog: PublicMerchant[]): CatalogEntry[] {
  * are the same string. The price is the LIST price, before tax. Merchant text is neutralised the same
  * way as in llms.txt (and more): no links of any scheme, HTML, link syntax or code spans, on one line.
  */
-export function toUcpProduct(baseUrl: string, merchant: Pick<PublicMerchant, "slug" | "name">, product: PublicProduct, matched?: string[]) {
+export function toUcpProduct(baseUrl: string, merchant: Pick<PublicMerchant, "slug" | "name" | "isTest">, product: PublicProduct, matched?: string[]) {
   const id = ucpId(merchant.slug, product.id);
   const url = `${baseUrl}${productPath(merchant.slug, product.id)}`;
   const price = { amount: product.listPrice.amountMinor, currency: product.listPrice.currency };
-  const title = plainSafe(product.name) || "Untitled product";
-  const description = { plain: plainSafe(product.description ?? product.summary ?? product.name) || title };
+  const name = plainSafe(product.name) || "Untitled product";
+  // A test merchant's titles start with the fixed [TEST] marker (the product and its variant share the title).
+  const title = markTest(name, merchant.isTest);
+  const description = { plain: plainSafe(product.description ?? product.summary ?? product.name) || name };
   return {
     id,
     title,
@@ -190,6 +193,7 @@ export function toUcpProduct(baseUrl: string, merchant: Pick<PublicMerchant, "sl
         ...(matched ? { inputs: matched.map((input) => ({ id: input, match: "exact" })) } : {}),
         metadata: {
           price_basis: "list_price_before_tax",
+          ...(merchant.isTest ? { test_catalog: true } : {}),
           merchant: merchant.slug,
           merchant_page: `${baseUrl}${merchantPath(merchant.slug)}`,
           ...(product.billing ? { renews: describeBilling(product.billing) } : {}),
@@ -208,7 +212,9 @@ const envelope = (capability: string, status?: "error") => ({
   capabilities: { [capability]: [{ version: UCP_VERSION }] },
 });
 
-const infoMessages = () => [
+/** Info messages for every response. A response that includes a test merchant's product says so, in fixed text. */
+const infoMessages = (products: { variants: { metadata: { test_catalog?: boolean } }[] }[] = []) => [
+  ...(products.some((p) => p.variants.some((v) => v.metadata.test_catalog)) ? [{ type: "info", code: "test_catalog", content: TEST_NOTE }] : []),
   { type: "info", code: "price_before_tax", content: TAX_NOTE },
   { type: "info", code: "merchant_text", content: MERCHANT_TEXT_NOTE },
 ];
@@ -268,13 +274,14 @@ export function searchCatalog(input: { baseUrl: string; catalog: PublicMerchant[
     return terms.every((t) => haystack.includes(t));
   });
   const page = hits.slice(offset, offset + limit);
+  const products = page.map(({ merchant, product }) => toUcpProduct(baseUrl, merchant, product));
   const next = offset + page.length;
   const hasNext = next < hits.length;
   return {
     ucp: envelope(CAP_SEARCH),
-    products: page.map(({ merchant, product }) => toUcpProduct(baseUrl, merchant, product)),
+    products,
     pagination: { has_next_page: hasNext, total_count: hits.length, ...(hasNext ? { cursor: encodeCursor(next) } : {}) },
-    messages: infoMessages(),
+    messages: infoMessages(products),
   };
 }
 
@@ -296,7 +303,7 @@ export function lookupCatalog(input: { baseUrl: string; catalog: PublicMerchant[
     products.push(toUcpProduct(baseUrl, entry.merchant, entry.product, [id]));
   }
   const notFound = missing > 0 ? [{ type: "info", code: "not_found", content: `${missing} of the requested identifiers did not match a product.` }] : [];
-  return { ucp: envelope(CAP_LOOKUP), products, messages: [...notFound, ...infoMessages()] };
+  return { ucp: envelope(CAP_LOOKUP), products, messages: [...notFound, ...infoMessages(products)] };
 }
 
 /** POST /ucp/catalog/product: an unknown product is an application outcome (HTTP 200, ucp.status "error"), per the spec. */
@@ -308,5 +315,6 @@ export function getCatalogProduct(input: { baseUrl: string; catalog: PublicMerch
   if (!entry || !matchesFilters(entry.product, request.filters, currency)) {
     return ucpError(CAP_LOOKUP, "not_found", "Product not found.");
   }
-  return { ucp: envelope(CAP_LOOKUP), product: toUcpProduct(baseUrl, entry.merchant, entry.product), messages: infoMessages() };
+  const product = toUcpProduct(baseUrl, entry.merchant, entry.product);
+  return { ucp: envelope(CAP_LOOKUP), product, messages: infoMessages([product]) };
 }

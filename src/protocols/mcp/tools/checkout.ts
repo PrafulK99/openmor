@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { createCheckout } from "@/core/checkout";
+import { markTest, TEST_NOTE } from "@/core/visibility";
 import { money, moneySchema } from "../format";
 import { ok } from "../results";
 import { defineTool } from "../tool";
@@ -16,6 +17,7 @@ const outputSchema = z.object({
   status: STATUS,
   checkout_url: z.string().nullable().describe("Secure Dodo Payments page where the buyer pays. Give it to the buyer."),
   product_name: z.string(),
+  is_test: z.boolean().describe("True when the merchant is in test mode: the checkout is for testing and is not a real purchase."),
   amount_due: moneySchema.describe("The quoted total. The checkout page shows the final amount."),
   is_new_order: z.boolean().describe("False when this exact quote and email were already checked out: same order and link."),
 });
@@ -40,23 +42,27 @@ export const checkoutTool = defineTool({
       buyerEmail: input.buyer_email,
       ...(agentSessionId ? { agentSessionId } : {}),
     });
+    const productName = markTest(order.productName, order.isTest);
     const due = money(order.quoted.total, order.quoted.currency);
 
     let summary: string;
     if (order.status === "paid" || order.status === "fulfilled") {
-      summary = `This order for ${order.productName} is already paid. Call get_order to get what the buyer received.`;
+      summary = `This order for ${productName} is already paid. Call get_order to get what the buyer received.`;
     } else if (!order.checkoutUrl) {
-      summary = `The order for ${order.productName} has no payment link yet. Call checkout again with the same quote_id and buyer_email.`;
+      summary = `The order for ${productName} has no payment link yet. Call checkout again with the same quote_id and buyer_email.`;
     } else {
-      summary = `Open this link to pay ${due.formatted} for ${order.productName}. The final amount is shown on the checkout page.`;
+      summary = `Open this link to pay ${due.formatted} for ${productName}. The final amount is shown on the checkout page.`;
     }
+
+    if (order.isTest) summary += ` ${TEST_NOTE}`;
 
     return ok(
       {
         order_id: order.id,
         status: order.status,
         checkout_url: order.checkoutUrl,
-        product_name: order.productName,
+        product_name: productName,
+        is_test: order.isTest,
         amount_due: due,
         is_new_order: created,
       },

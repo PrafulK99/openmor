@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { searchProducts } from "@/core/search";
+import { markTest, TEST_NOTE } from "@/core/visibility";
 import { money, moneySchema } from "../format";
 import { invalid, ok } from "../results";
 import { defineTool } from "../tool";
@@ -32,6 +33,7 @@ const productSchema = z.object({
   merchant_name: z.string(),
   product_id: z.string(),
   name: z.string(),
+  is_test: z.boolean().describe("True when the merchant is in test mode: not a real product. Its name starts with [TEST]."),
   description: z.string().nullable(),
   list_price: moneySchema.describe("Base price before tax and currency conversion. Not what the buyer pays."),
   billing_type: z.enum(["one_time", "subscription"]),
@@ -82,7 +84,8 @@ export const searchProductsTool = defineTool({
       merchant_slug: r.merchantSlug,
       merchant_name: r.merchantName,
       product_id: r.productId,
-      name: r.name,
+      name: markTest(r.name, r.isTest),
+      is_test: r.isTest,
       description: r.description,
       list_price: money(r.price, r.currency),
       billing_type: r.billingType,
@@ -100,6 +103,8 @@ export const searchProductsTool = defineTool({
       const more = products.length > 3 ? ` and ${products.length - 3} more` : "";
       summary = `Found ${products.length} product${products.length === 1 ? "" : "s"} for ${label}: ${shown}${more}. List prices exclude tax; call get_quote for the buyer's price.`;
     }
+
+    if (products.some((p) => p.is_test)) summary += ` ${TEST_NOTE}`;
 
     return ok({ query, count: products.length, products }, summary);
   },

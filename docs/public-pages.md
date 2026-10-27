@@ -40,12 +40,39 @@ always returns HTML.
 
 ## What is public
 
-- A **merchant** appears only if it has opted in to the network.
+- A **merchant** appears only if it has opted in to the network **and is in live mode** (see
+  [Test-mode merchants](#test-mode-merchants)).
 - A **product** appears only if it is marked agent-sellable and is still active.
-- Anything else (unknown slug, malformed slug, opted-out merchant, hidden or retired product) returns
+- Anything else (unknown slug, malformed slug, opted-out or test-mode merchant, hidden or retired product) returns
   the **same bare 404**. Nothing says which of those it was.
 - Never shown: merchant API keys or secrets, emails, internal merchant ids, provider ids, raw provider
   data, buyer data. The only id shown is the public product id (the one agents pass as `product_id`).
+
+## Test-mode merchants
+
+A merchant is in test mode unless it has both `dodoEnvironment = live_mode` and `liveModeEnabled` set (the
+same rule that picks the Dodo environment). One shared rule, `src/core/visibility.ts`, decides who is
+visible on **every** surface: the pages and index, the markdown twins, `llms.txt` and `sitemap.xml`, the
+UCP catalog, and the MCP tools `search_products`, `get_product`, `get_quote` and `checkout`.
+
+- **Flag off (the default):** test-mode merchants are hidden. Every surface answers exactly as for an
+  unknown merchant: the same bare 404 for pages and twins, the same UCP "not found", the same
+  `MERCHANT_NOT_FOUND` from MCP. A quote made while a merchant was visible cannot be checked out once it
+  is hidden.
+- **`PUBLIC_INCLUDE_TEST_MERCHANTS=true`:** test-mode merchants are shown and marked with fixed strings
+  (never merchant text):
+  - `[TEST]` in front of product names in `search_products`, `get_product`, `get_quote`, `checkout` and
+    `get_order`, an `is_test` field, and the sentence "TEST CATALOG: ..." in their summaries;
+  - a banner on the merchant and product pages and on the markdown twins;
+  - a line in `/llms.txt` and in the merchant's `llms.txt`;
+  - in the UCP catalog, `[TEST]` in front of the product and variant titles, `metadata.test_catalog: true`
+    on the variant, and a `test_catalog` info message.
+- Test merchants' pages are `noindex` (page metadata; twins always send `X-Robots-Tag: noindex`) and are
+  **left out of `sitemap.xml`**.
+- The flag accepts only `true` or `false`; anything else stops the server from starting. Only the exact
+  value `true` turns it on. It is read when the cache is filled, so a change shows up after a redeploy.
+- Set it to `true` only where a test merchant is the only merchant (today's production). Remove it once
+  there is a live merchant, so a test catalog never shows next to real ones.
 
 ## Prices
 
@@ -129,6 +156,9 @@ Things to look at:
 - A merchant with `networkOptIn` off, and a product with `agentSellable` off, return the 404 and appear
   nowhere (not in `/llms.txt` or `/sitemap.xml`). Compare the 404 body for an unknown slug and for an
   opted-out one: it is identical.
+- A merchant in test mode (the default for a new merchant) is hidden the same way unless
+  `PUBLIC_INCLUDE_TEST_MERCHANTS=true` is set; with it set, its pages show the TEST banner and it is not in
+  `/sitemap.xml`. Restart the server after changing the variable.
 - The absolute links use `APP_URL` as it was at build time. If they show an old address, rebuild.
 
 ## Check them on a Vercel preview

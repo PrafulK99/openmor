@@ -19,6 +19,8 @@ export interface CoreDeps {
   adapterFor: AdapterFor;
   /** Injectable clock for tests. Defaults to the real time. */
   now?: () => Date;
+  /** Show test-mode merchants. Off unless the deployment sets PUBLIC_INCLUDE_TEST_MERCHANTS=true (see core/visibility.ts). */
+  includeTestMerchants?: boolean;
 }
 
 export function nowFrom(deps: Pick<CoreDeps, "now">): Date {

@@ -11,7 +11,9 @@ export const MAX_SITEMAP_URLS = 50_000;
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = publicBaseUrl();
   const index = await orDeferToRequest(cachedPublicIndex);
+  // Test merchants (only present when the deployment includes them) are never listed for crawlers.
   return index
+    .filter((m) => !m.isTest)
     .flatMap((m) => [
       { url: `${base}${merchantPath(m.slug)}`, lastModified: m.updatedAt },
       ...m.products.map((p) => ({ url: `${base}${productPath(m.slug, p.id)}`, lastModified: p.updatedAt })),

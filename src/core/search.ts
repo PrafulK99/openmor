@@ -1,5 +1,6 @@
 import type { Prisma } from "@/generated/prisma/client";
 import type { CoreDeps } from "@/core/deps";
+import { isTestMerchant, merchantModeSelect, visibleMerchantWhere } from "@/core/visibility";
 
 export const SEARCH_LIMIT = 20;
 const MAX_QUERY_LENGTH = 100;
@@ -23,6 +24,8 @@ export interface SearchResult {
   price: number;
   currency: string;
   billingType: "one_time" | "subscription";
+  /** The merchant is in test mode (only seen when the deployment includes test merchants). */
+  isTest: boolean;
 }
 
 const resultSelect = {
@@ -32,7 +35,7 @@ const resultSelect = {
   priceAmount: true,
   currency: true,
   isRecurring: true,
-  merchant: { select: { id: true, slug: true, name: true } },
+  merchant: { select: { id: true, slug: true, name: true, ...merchantModeSelect } },
 } as const;
 
 type Row = Prisma.ProductGetPayload<{ select: typeof resultSelect }>;
@@ -48,6 +51,7 @@ function toResult(row: Row): SearchResult {
     price: row.priceAmount,
     currency: row.currency,
     billingType: row.isRecurring ? "subscription" : "one_time",
+    isTest: isTestMerchant(row.merchant),
   };
 }
 
@@ -63,7 +67,7 @@ export async function searchProducts(deps: CoreDeps, input: SearchInput): Promis
     active: true,
     merchant: {
       is: {
-        networkOptIn: true,
+        ...visibleMerchantWhere(deps),
         ...(input.merchantSlug ? { slug: input.merchantSlug.trim().toLowerCase() } : {}),
       },
     },

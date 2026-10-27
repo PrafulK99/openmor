@@ -3,6 +3,7 @@ import { normalizeEmail } from "@/core/checkout";
 import { OpenMorError } from "@/core/errors";
 import { getOrderFulfillment } from "@/core/fulfillment";
 import { getOrder } from "@/core/orders";
+import { markTest, TEST_NOTE } from "@/core/visibility";
 import { money, moneySchema } from "../format";
 import { invalid, ok } from "../results";
 import { defineTool } from "../tool";
@@ -38,6 +39,7 @@ const outputSchema = z.object({
   order_id: z.string(),
   status: z.enum(["pending_payment", "paid", "failed", "cancelled", "fulfilled", "refunded"]),
   product_name: z.string(),
+  is_test: z.boolean().describe("True when the merchant is in test mode: this order is not a real purchase."),
   quoted_total: moneySchema,
   amount_charged: moneySchema.nullable().describe("What was actually charged. Null until paid."),
   paid_at: z.string().nullable(),
@@ -67,6 +69,7 @@ export const getOrderTool = defineTool({
     const order = await getOrder(deps, orderId);
     if (!order) throw new OpenMorError("ORDER_NOT_FOUND", `No order "${orderId}"`);
 
+    const productName = markTest(order.productName, order.isTest);
     const paid = PAID.has(order.status);
     let emailMatches = false;
     if (input.buyer_email !== undefined && input.buyer_email.trim() !== "") {
@@ -109,23 +112,26 @@ export const getOrderTool = defineTool({
           fulfillment.subscription ? `subscription ${fulfillment.subscription.status}` : null,
           fulfillment.portal_url ? "a customer portal link" : null,
         ].filter(Boolean);
-        summary = `Payment received: ${amount}${drift} for ${order.productName}.${parts.length ? ` Delivered: ${parts.join(", ")}; give them to the buyer.` : ""}`;
+        summary = `Payment received: ${amount}${drift} for ${productName}.${parts.length ? ` Delivered: ${parts.join(", ")}; give them to the buyer.` : ""}`;
       } else {
-        summary = `Payment received: ${amount}${drift} for ${order.productName}. Call get_order again with buyer_email to get the licence key and portal link.`;
+        summary = `Payment received: ${amount}${drift} for ${productName}. Call get_order again with buyer_email to get the licence key and portal link.`;
       }
     } else if (order.status === "pending_payment") {
-      summary = `Waiting for payment of ${quoted.formatted} for ${order.productName}. If the buyer has not paid yet, give them the checkout link again.`;
+      summary = `Waiting for payment of ${quoted.formatted} for ${productName}. If the buyer has not paid yet, give them the checkout link again.`;
     } else if (order.status === "failed" || order.status === "cancelled") {
-      summary = `The last payment attempt for ${order.productName} ${order.status === "failed" ? "failed" : "was cancelled"}. The buyer can try again on the same checkout link.`;
+      summary = `The last payment attempt for ${productName} ${order.status === "failed" ? "failed" : "was cancelled"}. The buyer can try again on the same checkout link.`;
     } else {
-      summary = `Order for ${order.productName} is ${order.status}.`;
+      summary = `Order for ${productName} is ${order.status}.`;
     }
+
+    if (order.isTest) summary += ` ${TEST_NOTE}`;
 
     return ok(
       {
         order_id: order.id,
         status: order.status,
-        product_name: order.productName,
+        product_name: productName,
+        is_test: order.isTest,
         quoted_total: quoted,
         amount_charged: charged,
         paid_at: order.paidAt ? order.paidAt.toISOString() : null,

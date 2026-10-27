@@ -2,6 +2,7 @@ import { z } from "zod";
 import { nowFrom } from "@/core/deps";
 import { getProductDetails } from "@/core/products";
 import { createQuote } from "@/core/quotes";
+import { markTest, TEST_NOTE } from "@/core/visibility";
 import { bpsToPercent, cadence, countryName, money, moneySchema, taxName } from "../format";
 import { invalid, ok } from "../results";
 import { defineTool } from "../tool";
@@ -22,6 +23,7 @@ const outputSchema = z.object({
   merchant_id: z.string(),
   product_id: z.string(),
   product_name: z.string(),
+  is_test: z.boolean().describe("True when the merchant is in test mode: a test quote, not a real purchase."),
   quantity: z.number().int(),
   buyer_country: z.string(),
   buyer_state: z.string().nullable(),
@@ -100,7 +102,8 @@ export const getQuoteTool = defineTool({
     const renewal = q.recurring ? { total: m(q.recurring.total), tax: m(q.recurring.tax), interval: every } : null;
     const taxRatePercent = q.taxRateBps === null ? null : bpsToPercent(q.taxRateBps);
 
-    const name = quantity > 1 ? `${quantity} × ${product.name}` : product.name;
+    const productName = markTest(product.name, product.merchant.isTest);
+    const name = quantity > 1 ? `${quantity} × ${productName}` : productName;
     const where = `${countryName(country)}${state ? ` (${state})` : ""}`;
     const tax = taxName(country);
     const total = m(q.total).formatted;
@@ -117,6 +120,7 @@ export const getQuoteTool = defineTool({
       summary += ` Converted from ${product.currency}, so the final amount may move slightly at checkout.`;
     }
     if (renewal) summary += ` Renews at ${renewal.total.formatted} ${every ?? "each billing period"}.`;
+    if (product.merchant.isTest) summary += ` ${TEST_NOTE}`;
     const expiresInSeconds = Math.max(0, Math.floor((q.expiresAt.getTime() - nowFrom(deps).getTime()) / 1000));
     const minutes = Math.round(expiresInSeconds / 60);
     const untilUtc = q.expiresAt.toISOString().slice(11, 16);
@@ -128,7 +132,8 @@ export const getQuoteTool = defineTool({
         quote_id: q.id,
         merchant_id: q.merchantId,
         product_id: q.productId,
-        product_name: product.name,
+        product_name: productName,
+        is_test: product.merchant.isTest,
         quantity: q.quantity,
         buyer_country: q.country,
         buyer_state: q.state,

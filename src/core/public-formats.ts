@@ -9,6 +9,7 @@
 import { currencyDigits } from "@/core/money";
 import { formatListPrice, type PublicIndexMerchant, type PublicMerchant, type PublicProduct } from "@/core/public-catalog";
 import type { BillingPeriod } from "@/core/types";
+import { TEST_NOTE } from "@/core/visibility";
 
 /** The tools the OpenMoR connector offers today. A test keeps this in step with the connector. */
 export const CONNECTOR_TOOLS = ["search_products", "get_product", "get_quote", "checkout", "get_order"] as const;
@@ -150,6 +151,7 @@ export function buildNetworkLlmsTxt(input: { baseUrl: string; merchants: PublicI
     `Tools: ${CONNECTOR_TOOLS.join(", ")}`,
     TAX_NOTE,
     MERCHANT_TEXT_NOTE,
+    ...(merchants.some((m) => m.isTest) ? [TEST_NOTE] : []),
     "",
     "## Merchants",
     "",
@@ -159,7 +161,7 @@ export function buildNetworkLlmsTxt(input: { baseUrl: string; merchants: PublicI
   } else {
     for (const m of merchants) {
       lines.push(
-        `- [${llmsSafe(m.name)}](${baseUrl}${merchantPath(m.slug)}): ${plural(m.products.length, "product")}. Summary for agents: ${baseUrl}${merchantPath(m.slug)}/llms.txt. Markdown: ${baseUrl}${merchantPath(m.slug)}.md`,
+        `- [${llmsSafe(m.name)}](${baseUrl}${merchantPath(m.slug)}): ${plural(m.products.length, "product")}. Summary for agents: ${baseUrl}${merchantPath(m.slug)}/llms.txt. Markdown: ${baseUrl}${merchantPath(m.slug)}.md${m.isTest ? " TEST merchant (test mode)." : ""}`,
       );
     }
   }
@@ -179,6 +181,7 @@ export function buildMerchantLlmsTxt(input: { baseUrl: string; merchant: PublicM
     `Call search_products with merchant "${merchant.slug}" to get the merchant_id and product_id values, then get_quote with the buyer's country, then checkout. The buyer pays on a secure Dodo Payments page, so never ask a buyer for card details.`,
     TAX_NOTE,
     MERCHANT_TEXT_NOTE,
+    ...(merchant.isTest ? [TEST_NOTE] : []),
     "",
     `Page for people: ${baseUrl}${merchantPath(merchant.slug)}`,
     `Markdown version of this merchant page: ${baseUrl}${merchantPath(merchant.slug)}.md`,

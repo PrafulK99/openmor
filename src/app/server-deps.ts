@@ -7,12 +7,12 @@ let deps: Promise<CheckoutDeps> | undefined;
 
 export function getServerDeps(): Promise<CheckoutDeps> {
   deps ??= (async () => {
-    const [{ db }, { adapterFor }, { env }] = await Promise.all([
+    const [{ db }, { adapterFor }, { env, includeTestMerchants }] = await Promise.all([
       import("@/lib/db"),
       import("@/adapters"),
       import("@/lib/env"),
     ]);
-    return { db, adapterFor, appUrl: env().APP_URL };
+    return { db, adapterFor, appUrl: env().APP_URL, includeTestMerchants: includeTestMerchants() };
   })();
   return deps;
 }

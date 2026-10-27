@@ -45,8 +45,8 @@ export async function orDeferToRequest<T>(read: () => Promise<T>): Promise<T> {
 
 async function publicDeps() {
   // Loaded lazily so importing this module needs no environment variables.
-  const { db } = await import("@/lib/db");
-  return { db };
+  const [{ db }, { includeTestMerchants }] = await Promise.all([import("@/lib/db"), import("@/lib/env")]);
+  return { db, includeTestMerchants: includeTestMerchants() };
 }
 
 export async function cachedPublicMerchant(slug: string) {

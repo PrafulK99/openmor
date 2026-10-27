@@ -25,6 +25,7 @@ describe("searchProducts", () => {
         price: 4900,
         currency: "USD",
         billingType: "one_time",
+        isTest: false,
       },
     ]);
   });
