@@ -26,6 +26,7 @@ Set these under **Project > Settings > Environment Variables**, for the **Produc
 | `DATABASE_URL` | Supabase **Transaction pooler** connection string (port `6543`). Find it under Supabase **Project Settings > Database > Connection string**. |
 | `ENCRYPTION_KEY` | **The same key** as the environment whose database you point at. Merchant Dodo API keys and webhook secrets are encrypted with it; a different key makes every stored key unreadable. |
 | `APP_URL` | The public `https://` URL of the deployment, with no trailing slash, e.g. `https://openmor.vercel.app`. It's used in checkout return URLs. |
+| `PUBLIC_INCLUDE_TEST_MERCHANTS` | `true` while the only merchant is a test-mode one, otherwise leave it unset. Test-mode merchants are **hidden from every public page, file, catalog and MCP tool** unless this is exactly `true`; with it on they are marked `[TEST]` and kept out of the sitemap. Remove it when a live merchant exists. Redeploy after changing it. See [public-pages.md](public-pages.md#test-mode-merchants). |
 | `DODO_ENVIRONMENT` | `test_mode`. Leave it in test mode until live mode is deliberately enabled per merchant. |
 
 Do **not** set these in Vercel:
