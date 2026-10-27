@@ -7,11 +7,12 @@ import { TEST_NOTE } from "@/core/visibility";
 import { connectorUrl, describeBilling, merchantPath, PRICE_DEPENDS_NOTE, productJsonLd, productPath, safeJsonLd, TAX_NOTE } from "@/core/public-formats";
 
 const page = { padding: "2rem", fontFamily: "system-ui, sans-serif", maxWidth: "44rem", margin: "0 auto", lineHeight: 1.5 } as const;
-const muted = { color: "#555" } as const;
+// Colors are CSS variables (src/app/globals.css) so they follow the visitor's light or dark scheme.
+const muted = { color: "var(--muted)" } as const;
 
 function TestBanner() {
   return (
-    <p role="note" style={{ border: "2px solid #b45309", background: "#fffbeb", padding: "0.75rem 1rem" }}>
+    <p role="note" style={{ border: "2px solid var(--banner-border)", background: "var(--banner-bg)", color: "var(--banner-fg)", padding: "0.75rem 1rem" }}>
       <strong>{TEST_NOTE}</strong>
     </p>
   );
