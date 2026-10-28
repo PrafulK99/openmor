@@ -10,17 +10,32 @@
   --banner-bg: #fffbeb;
   --banner-fg: #451a03;
   --banner-border: #b45309;
-  /* Landing page. Cards and the proof strip sit on --surface: 7.14:1 (secondary text), 16.5:1 (page text). */
-  --surface: #fafafa;
-  --border: #d4d4d4;
-  /* The one accent: 7.51:1 on the background, and --accent-fg on it the same. */
+  /* Landing page (src/app/_home). Every text pair is checked for 7:1 in src/app/globals.test.ts. */
+  --home-bg: #f8faff;
+  --home-glow: #effbf7;
+  --home-muted: #4a5260;
+  --surface: #ffffff;
+  --border: #d9e2ea;
   --accent: #0f5f58;
   --accent-fg: #ffffff;
-  /* Code blocks are dark in both schemes. */
-  --code-bg: #0f1720;
-  --code-fg: #e6edf3;
+  --chip-bg: #e3f8f3;
+  --chip-fg: #0b4a44;
+  --chip-border: #9fdccf;
+  --receipt-bg: #effcf8;
+  --primary-bg: #0f172a;
+  --primary-fg: #ffffff;
+  /* The floating navbar and code windows are dark in both schemes. */
+  --nav-bg: #0f172a;
+  --nav-fg: #d5dde8;
+  --nav-border: #1e293b;
+  --nav-accent: #5eead4;
+  --nav-cta-fg: #042f2e;
+  --code-bg: #0b121e;
+  --code-bar: #0f172a;
+  --code-fg: #e2e8f0;
   --code-muted: #9fb0c0;
   --code-accent: #7ee0d2;
+  --code-string: #a7f3d0;
   color-scheme: light dark;
 }
 
@@ -37,15 +52,30 @@
     --banner-bg: #3b1d06;
     --banner-fg: #fef3c7;
     --banner-border: #f59e0b;
-    --surface: #141414;
-    --border: #2e2e2e;
-    /* 10.9:1 on the background; dark text on it 9.4:1. */
+    --home-bg: #080c11;
+    --home-glow: #0b1a19;
+    --home-muted: #b8c2cc;
+    --surface: #10171f;
+    --border: #263241;
     --accent: #5fd3c3;
     --accent-fg: #04201d;
-    --code-bg: #111a22;
-    --code-fg: #e6edf3;
+    --chip-bg: #0d2b27;
+    --chip-fg: #99f6e4;
+    --chip-border: #1f5a52;
+    --receipt-bg: #0c1f1c;
+    --primary-bg: #5fd3c3;
+    --primary-fg: #04201d;
+    --nav-bg: #111c2e;
+    --nav-fg: #d5dde8;
+    --nav-border: #2b3a4f;
+    --nav-accent: #5eead4;
+    --nav-cta-fg: #042f2e;
+    --code-bg: #0b121e;
+    --code-bar: #121d2e;
+    --code-fg: #e2e8f0;
     --code-muted: #9fb0c0;
     --code-accent: #7ee0d2;
+    --code-string: #a7f3d0;
   }
 }
 
