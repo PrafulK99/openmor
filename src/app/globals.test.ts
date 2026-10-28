@@ -28,6 +28,16 @@ const PAIRS: [string, string, string][] = [
   ["link", "link", "background"],
   ["visited link", "link-visited", "background"],
   ["TEST CATALOG banner", "banner-fg", "banner-bg"],
+  // Landing page.
+  ["card text", "foreground", "surface"],
+  ["card secondary text", "muted", "surface"],
+  ["link in a card", "link", "surface"],
+  ["accent text", "accent", "background"],
+  ["accent text in a card", "accent", "surface"],
+  ["primary button", "accent-fg", "accent"],
+  ["code", "code-fg", "code-bg"],
+  ["code comment", "code-muted", "code-bg"],
+  ["code prompt", "code-accent", "code-bg"],
 ];
 
 describe.each([

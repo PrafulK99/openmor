@@ -10,6 +10,17 @@
   --banner-bg: #fffbeb;
   --banner-fg: #451a03;
   --banner-border: #b45309;
+  /* Landing page. Cards and the proof strip sit on --surface: 7.14:1 (secondary text), 16.5:1 (page text). */
+  --surface: #fafafa;
+  --border: #d4d4d4;
+  /* The one accent: 7.51:1 on the background, and --accent-fg on it the same. */
+  --accent: #0f5f58;
+  --accent-fg: #ffffff;
+  /* Code blocks are dark in both schemes. */
+  --code-bg: #0f1720;
+  --code-fg: #e6edf3;
+  --code-muted: #9fb0c0;
+  --code-accent: #7ee0d2;
   color-scheme: light dark;
 }
 
@@ -26,6 +37,15 @@
     --banner-bg: #3b1d06;
     --banner-fg: #fef3c7;
     --banner-border: #f59e0b;
+    --surface: #141414;
+    --border: #2e2e2e;
+    /* 10.9:1 on the background; dark text on it 9.4:1. */
+    --accent: #5fd3c3;
+    --accent-fg: #04201d;
+    --code-bg: #111a22;
+    --code-fg: #e6edf3;
+    --code-muted: #9fb0c0;
+    --code-accent: #7ee0d2;
   }
 }
 
