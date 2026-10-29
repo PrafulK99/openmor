@@ -190,8 +190,22 @@
 
 @media (min-width: 1024px) {
   .hero {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 520px);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 470px);
     gap: 4rem;
+    align-items: stretch;
+  }
+
+  /* The text spans the card's height: the badge sits level with the card's top edge and the chips with its bottom edge. */
+  .heroText {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: space-between;
+  }
+
+  .heroText > * {
+    margin-top: 0;
+    margin-bottom: 0;
   }
 }
 
@@ -199,7 +213,7 @@
   display: inline-flex;
   align-items: center;
   gap: 0.6rem;
-  margin: 0 0 1.5rem;
+  margin: 0 0 1.75rem;
   padding: 0.4rem 1rem;
   border: 1px solid var(--chip-border);
   border-radius: 999px;
@@ -227,7 +241,7 @@
 }
 
 .lede {
-  margin: 1.5rem 0 0;
+  margin: 1.75rem 0 0;
   max-width: 33rem;
   color: var(--home-muted);
   font-size: clamp(1.0625rem, 0.4vw + 1rem, 1.1875rem);
@@ -238,7 +252,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
-  margin-top: 2rem;
+  margin-top: 2.25rem;
 }
 
 .button {
@@ -278,7 +292,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.6rem;
-  margin: 2.25rem 0 0;
+  margin: 2.5rem 0 0;
   padding: 0;
   list-style: none;
 }
@@ -305,18 +319,18 @@
 /* Hero card: a terminal pill, a code block, then a receipt-style quote. */
 .heroCard {
   display: grid;
-  gap: 0.75rem;
+  gap: 0.5rem;
   min-width: 0;
-  padding: 0.75rem;
+  padding: 0.6rem;
   border: 1px solid var(--chip-border);
-  border-radius: 32px;
+  border-radius: 28px;
   background: var(--surface);
   box-shadow: 0 20px 40px -24px var(--home-shadow);
 }
 
 @media (min-width: 640px) {
   .heroCard {
-    padding: 1.25rem;
+    padding: 0.85rem;
   }
 }
 
@@ -325,8 +339,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  padding: 0.65rem 1rem;
-  border-radius: 18px;
+  padding: 0.35rem 0.9rem;
+  border-radius: 14px;
   background: var(--code-bar);
   color: var(--code-muted);
   font-family: var(--mono);
@@ -367,12 +381,12 @@
 
 .code {
   margin: 0;
-  padding: 1.1rem 1.25rem;
-  border-radius: 18px;
+  padding: 0.65rem 1rem;
+  border-radius: 16px;
   background: var(--code-bg);
   color: var(--code-fg);
-  font-size: 0.8125rem;
-  line-height: 1.7;
+  font-size: 0.75rem;
+  line-height: 1.55;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -392,14 +406,18 @@
 }
 
 .receipt {
-  padding: 1.1rem 1.25rem;
+  padding: 0.85rem 1rem;
   border: 1px solid var(--chip-border);
-  border-radius: 22px;
+  border-radius: 20px;
   background: linear-gradient(to bottom, var(--receipt-bg), var(--surface));
 }
 
 .receiptHead {
-  padding-bottom: 0.85rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.75rem;
+  padding-bottom: 0.55rem;
   border-bottom: 1px solid var(--chip-border);
 }
 
@@ -417,18 +435,18 @@
 }
 
 .receiptName {
-  margin: 0.45rem 0 0;
-  font-size: 1.0625rem;
+  margin: 0;
+  font-size: 1rem;
   font-weight: 600;
   letter-spacing: -0.01em;
 }
 
 .receiptLines {
   display: grid;
-  gap: 0.5rem;
-  margin: 0.85rem 0 0;
+  gap: 0.3rem;
+  margin: 0.6rem 0 0;
   font-family: var(--mono);
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
 }
 
 .line {
@@ -471,8 +489,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem 1rem;
-  margin: 0.9rem 0 0;
-  padding-top: 0.75rem;
+  margin: 0.65rem 0 0;
+  padding-top: 0.6rem;
   border-top: 1px solid var(--chip-border);
   font-family: var(--mono);
   font-size: 0.75rem;
@@ -512,10 +530,10 @@
 }
 
 .receiptNote {
-  margin: 0.75rem 0 0;
+  margin: 0.5rem 0 0;
   color: var(--home-muted);
-  font-size: 0.8125rem;
-  line-height: 1.5;
+  font-size: 0.75rem;
+  line-height: 1.45;
 }
 
 /* Test catalog notice. */

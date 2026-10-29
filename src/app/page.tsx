@@ -56,19 +56,17 @@ function HeroTerminal() {
         {str(Q.request.product_id)}
         {",\n    buyer_country: "}
         {str(Q.request.buyer_country)}
-        {"\n  })\n\n"}
+        {" })\n"}
         <span className={s.comment}>{"// response, abridged\n"}</span>
         {"  quote_id: "}
         {str(r.quote_id)}
         {"\n  currency: "}
         {str(r.currency)}
-        {"\n  total.formatted: "}
+        {", total.formatted: "}
         {str(r.total.formatted)}
-        {`\n  tax_rate_percent: ${r.tax_rate_percent}`}
-        {`\n  is_converted: ${r.is_converted}`}
-        {"\n  list_currency: "}
+        {`\n  tax_rate_percent: ${r.tax_rate_percent}, is_binding: ${r.is_binding}`}
+        {`\n  is_converted: ${r.is_converted}, list_currency: `}
         {str(r.list_currency)}
-        {`\n  is_binding: ${r.is_binding}`}
         {`\n  expires_in_seconds: ${r.expires_in_seconds}`}
       </pre>
     </>
@@ -111,8 +109,8 @@ function QuoteCard() {
         <span className={s.pill}>Test mode</span>
       </div>
       <p className={s.receiptNote}>
-        Amounts vary with exchange rates. The list price is in USD and this quote was converted to EUR, from a real get_quote call on {Q.takenOn}. The buyer sees the final price
-        on Dodo&apos;s hosted checkout.
+        Amounts vary with exchange rates. The list price is in USD and this quote was converted to EUR (a real get_quote call, {Q.takenOn}). The buyer sees the final price on
+        Dodo&apos;s page.
       </p>
     </div>
   );
@@ -149,7 +147,7 @@ export default function Home() {
 
       <main id="main" className={s.wrap}>
         <section className={s.hero} aria-labelledby="hero-title">
-          <div>
+          <div className={s.heroText}>
             <p className={s.badge}>
               <span className={s.dot} aria-hidden="true" />
               Open source · test catalog
