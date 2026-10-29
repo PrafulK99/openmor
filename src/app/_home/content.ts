@@ -84,11 +84,11 @@ export const EXAMPLE_QUOTE = {
   },
 } as const;
 
-export const STATS: { label: string; value: string }[] = [
-  { label: "MCP tools", value: String(MCP_TOOL_NAMES.length) },
-  { label: "Front doors", value: "4" },
-  { label: "Licence", value: "Apache-2.0" },
-  { label: "Automated tests", value: `${TEST_COUNT_FLOOR}+` },
+export const STATS: { label: string; value: string; note: string }[] = [
+  { label: "MCP tools", value: String(MCP_TOOL_NAMES.length), note: "registered" },
+  { label: "Front doors", value: "4", note: "interfaces" },
+  { label: "Licence", value: "Apache-2.0", note: "open source" },
+  { label: "Automated tests", value: `${TEST_COUNT_FLOOR}+`, note: "in the repo" },
 ];
 
 export interface Step {
@@ -191,12 +191,12 @@ export const SECURITY_CONTROLS: { title: string; icon: IconName; body: string }[
   {
     title: "Merchant text is data",
     icon: "shield",
-    body: "Product names and descriptions are length-limited, cleaned and escaped, and never placed in links or tool descriptions.",
+    body: "Product text is length-limited and returned as separate fields, never inside tool descriptions or links. Public pages also clean and escape it.",
   },
 ];
 
 export const PROMPT_INJECTION_NOTE =
-  "Cleaning merchant text reduces the risk of prompt injection; it cannot remove it. Agents must still treat product text as data, not instructions.";
+  "Limiting and cleaning merchant text reduces the risk of prompt injection; it cannot remove it. Agents must still treat product text as data, not instructions.";
 
 export const CANT_DO_YET =
   "Today the buyer pays on Dodo's hosted page for every purchase, Dodo Payments is the only provider, and UCP is a read-only catalog with no checkout.";

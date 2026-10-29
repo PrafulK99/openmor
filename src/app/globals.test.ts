@@ -29,21 +29,22 @@ const PAIRS: [string, string, string][] = [
   ["visited link", "link-visited", "background"],
   ["TEST CATALOG banner", "banner-fg", "banner-bg"],
   // Landing page.
-  ["landing page text", "foreground", "home-bg"],
-  ["landing secondary text", "home-muted", "home-bg"],
-  ["landing accent text", "accent", "home-bg"],
-  ["landing link", "link", "home-bg"],
-  ["hero text over the glow", "foreground", "home-glow"],
+  ["home text", "home-fg", "home-bg"],
+  ["home secondary text", "home-muted", "home-bg"],
+  ["home accent text", "accent", "home-bg"],
+  ["hero text over the glow", "home-fg", "home-glow"],
   ["hero secondary text over the glow", "home-muted", "home-glow"],
   ["hero accent text over the glow", "accent", "home-glow"],
-  ["card text", "foreground", "surface"],
+  ["card text", "home-fg", "surface"],
   ["card secondary text", "home-muted", "surface"],
   ["card accent text", "accent", "surface"],
-  ["link in a card", "link", "surface"],
   ["chip", "chip-fg", "chip-bg"],
-  ["quote card text", "foreground", "receipt-bg"],
+  ["step label on its chip", "accent", "chip-bg"],
+  ["chip text on a card", "chip-fg", "surface"],
+  ["icon in a gray bubble", "bubble-fg", "bubble-bg"],
+  ["quote card text", "home-fg", "receipt-bg"],
   ["quote card secondary text", "home-muted", "receipt-bg"],
-  ["quote card total", "accent", "receipt-bg"],
+  ["quote card accent text", "accent", "receipt-bg"],
   ["primary button", "primary-fg", "primary-bg"],
   ["accent button", "accent-fg", "accent"],
   ["navbar link", "nav-fg", "nav-bg"],
@@ -74,4 +75,10 @@ it("defines a dark value for every color that differs between schemes, and the b
   const views = readFileSync(new URL("./m/views.tsx", import.meta.url), "utf8");
   expect(views).toContain('color: "var(--banner-fg)"');
   expect(views).not.toMatch(/#[0-9a-f]{3,6}/i);
+});
+
+it("the landing page tokens are light in both schemes, like the design", () => {
+  for (const name of ["home-bg", "home-glow", "home-fg", "home-muted", "surface", "accent", "chip-bg", "receipt-bg"]) {
+    expect(dark[name], name).toBe(light[name]);
+  }
 });

@@ -49,19 +49,19 @@ function testFiles(dir: string): string[] {
 describe("numbers on the page match the code", () => {
   it("names exactly the MCP tools the connector registers", () => {
     expect([...MCP_TOOL_NAMES]).toEqual(TOOLS.map((t) => t.name));
-    expect(STATS[0]).toEqual({ label: "MCP tools", value: "5" });
+    expect(STATS[0]).toMatchObject({ label: "MCP tools", value: "5" });
     expect(text).toContain("5 MCP tools");
   });
 
   it("counts four front doors and labels them Door 01 to 04", () => {
     expect(FRONT_DOORS.map((d) => d.title)).toEqual(["MCP connector", "Readable pages and llms.txt", "Markdown twins", "UCP read-only catalog"]);
-    expect(STATS[1]).toEqual({ label: "Front doors", value: "4" });
+    expect(STATS[1]).toMatchObject({ label: "Front doors", value: "4" });
     for (const n of ["01", "02", "03", "04"]) expect(text).toContain(`Door ${n}`);
     expect(text).not.toMatch(/Protocol 0\d/);
   });
 
   it("states the licence from the repository", () => {
-    expect(STATS[2]).toEqual({ label: "Licence", value: "Apache-2.0" });
+    expect(STATS[2]).toMatchObject({ label: "Licence", value: "Apache-2.0" });
     expect(read("LICENSE")).toContain("Apache License");
     expect(JSON.parse(read("package.json")).license).toBe("Apache-2.0");
   });
@@ -70,7 +70,7 @@ describe("numbers on the page match the code", () => {
     // Counts test call sites (it(, test(, it.each(...)( ). Vitest runs at least this many, as each() expands.
     const sites = testFiles(join(ROOT, "src")).reduce((n, f) => n + [...readFileSync(f, "utf8").matchAll(/(^|[^.\w])(it|test)(\.each\([^)]*\))?\(/gm)].length, 0);
     expect(sites).toBeGreaterThanOrEqual(TEST_COUNT_FLOOR);
-    expect(STATS[3]).toEqual({ label: "Automated tests", value: `${TEST_COUNT_FLOOR}+` });
+    expect(STATS[3]).toMatchObject({ label: "Automated tests", value: `${TEST_COUNT_FLOOR}+` });
   });
 
   it("uses the real tool names, in purchase order, and the real quote lifetime", () => {
@@ -145,6 +145,10 @@ describe("content", () => {
       "telemetry",
       "executable",
       "sandbox",
+      "RPC",
+      "Ready for hosted checkout",
+      "agent-session",
+      "Registered MoR",
     ]) {
       expect(text.toLowerCase(), banned).not.toContain(banned.toLowerCase());
     }
@@ -168,6 +172,9 @@ describe("content", () => {
     expect(read("README.md")).toContain("Live mode needs an explicit per-merchant flag");
     expect(text).toContain("AES-256-GCM");
     expect(text).toContain("reduces the risk of prompt injection; it cannot remove it");
+    // Only the public pages clean and escape merchant text; MCP results are only length-limited (threat model).
+    expect(threat).toContain("MCP results carry names and descriptions with only the length limit");
+    expect(text).toContain("Public pages also clean and escape it");
   });
 
   it("keeps the roadmap honest: no provider names, no dates", () => {
@@ -255,6 +262,14 @@ describe("static and self-contained", () => {
     expect(imports("src/app/_home/icons.tsx")).toEqual([]);
     expect(imports("src/app/_home/copy-button.tsx")).toEqual(["./home.module.css", "./icons", "react"]);
     expect(read("src/app/_home/copy-button.tsx").startsWith('"use client";')).toBe(true);
+  });
+
+  it("is light in every color scheme, like the design", () => {
+    const globals = read("src/app/globals.css");
+    const darkBlock = globals.slice(globals.indexOf("@media (prefers-color-scheme: dark)"));
+    for (const token of ["home-bg", "home-fg", "home-muted", "surface", "accent", "chip-bg", "receipt-bg"]) expect(darkBlock, token).not.toContain(`--${token}:`);
+    expect(read("src/app/_home/home.module.css")).toMatch(/\.page \{[^}]*color-scheme: light;/);
+    expect(read("src/app/_home/home.module.css")).not.toContain("prefers-color-scheme");
   });
 
   it("styles use only the color variables, no external files, and animate only when motion is allowed", () => {
