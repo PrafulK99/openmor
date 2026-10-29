@@ -35,7 +35,7 @@ function HeroTerminal() {
   const r = Q.response;
   const str = (v: string) => <span className={s.string}>&quot;{v}&quot;</span>;
   return (
-    <div className={s.terminal}>
+    <>
       <div className={s.termBar}>
         <span className={s.termTitle}>
           <span className={s.lights} aria-hidden="true">
@@ -43,7 +43,7 @@ function HeroTerminal() {
             <i />
             <i />
           </span>
-          <span>MCP tool call</span>
+          <span className={s.termHint}>MCP tool call</span>
         </span>
         <span className={s.termTag}>get_quote</span>
       </div>
@@ -71,7 +71,7 @@ function HeroTerminal() {
         {`\n  is_binding: ${r.is_binding}`}
         {`\n  expires_in_seconds: ${r.expires_in_seconds}`}
       </pre>
-    </div>
+    </>
   );
 }
 
@@ -80,10 +80,8 @@ function QuoteCard() {
   return (
     <div className={s.receipt} role="group" aria-label="Example quote">
       <div className={s.receiptHead}>
-        <div>
-          <span className={s.receiptTag}>Example quote, test catalog</span>
-          <p className={s.receiptName}>{Q.productName}</p>
-        </div>
+        <span className={s.receiptTag}>Example quote, test catalog</span>
+        <p className={s.receiptName}>{Q.productName}</p>
       </div>
       <dl className={s.receiptLines}>
         <div className={s.line}>
@@ -103,9 +101,18 @@ function QuoteCard() {
           <dd>{r.total.formatted}</dd>
         </div>
       </dl>
-      <p className={s.receiptFoot}>
-        Amounts vary with exchange rates. The list price is in USD and this quote was converted to EUR, from a real get_quote call on {Q.takenOn}. The buyer sees the final
-        price on Dodo&apos;s hosted checkout.
+      <div className={s.receiptFoot}>
+        <span className={s.mor}>
+          <Icon name="badge" className={s.icon} />
+          <span>
+            Provider: <strong>Dodo Payments</strong>
+          </span>
+        </span>
+        <span className={s.pill}>Test mode</span>
+      </div>
+      <p className={s.receiptNote}>
+        Amounts vary with exchange rates. The list price is in USD and this quote was converted to EUR, from a real get_quote call on {Q.takenOn}. The buyer sees the final price
+        on Dodo&apos;s hosted checkout.
       </p>
     </div>
   );
@@ -121,20 +128,22 @@ export default function Home() {
       <div className={s.navShell}>
         <header className={s.navbar}>
           <Link className={s.wordmark} href="/" aria-label="OpenMoR home">
-            Open<span>MoR</span>
+            <span className={s.logoDot} aria-hidden="true">
+              <Icon name="coin" className={s.icon} />
+            </span>
+            <span>
+              Open<b>MoR</b>
+            </span>
           </Link>
           <nav className={s.navLinks} aria-label="Sections">
-            <a href={`#${SECTION.how}`} className={s.navOptional}>
-              How it works
-            </a>
-            <a href={DOCS.docs} className={s.navOptional}>
-              Docs
-            </a>
-            <a href={REPO_URL}>GitHub</a>
-            <a href={`#${SECTION.tryIt}`} className={s.navCta}>
-              Try it
-            </a>
+            <a href={`#${SECTION.how}`}>How it works</a>
+            <a href={`#${SECTION.tryIt}`}>Try it</a>
+            <a href={DOCS.docs}>Docs</a>
           </nav>
+          <a className={s.navCta} href={REPO_URL}>
+            GitHub
+            <Icon name="external" className={s.icon} />
+          </a>
         </header>
       </div>
 
@@ -146,7 +155,9 @@ export default function Home() {
               Open source · test catalog
             </p>
             <h1 id="hero-title" className={s.h1}>
-              Let AI agents buy your software.
+              Let AI agents
+              <br />
+              buy your software.
             </h1>
             <p className={s.lede}>
               OpenMoR lets agents find your products, quote them with the right tax for the buyer&apos;s country, and hand the buyer a secure hosted checkout. Built first for
@@ -157,7 +168,7 @@ export default function Home() {
                 Try it
               </a>
               <a className={s.button} href={REPO_URL}>
-                <Icon name="github" className={s.icon} />
+                <Icon name="terminal" className={s.icon} />
                 View on GitHub
               </a>
             </div>
@@ -184,11 +195,14 @@ export default function Home() {
 
         <div className={s.notice} role="note">
           <p>
-            <Icon name="info" className={s.icon} />
+            <span className={s.noticeIcon}>
+              <Icon name="info" className={s.icon} />
+            </span>
             <span>
               <strong>The live catalog is a test catalog.</strong> Its merchant is in Dodo test mode, its products are marked [TEST], and no real purchases happen.
             </span>
           </p>
+          <span className={s.pill}>Test mode</span>
         </div>
 
         <section aria-label="OpenMoR in numbers">
@@ -196,11 +210,14 @@ export default function Home() {
             {STATS.map((stat) => (
               <div key={stat.label} className={s.stat}>
                 <dt>{stat.label}</dt>
-                <dd className={/^\d/.test(stat.value) ? undefined : s.statWord}>{stat.value}</dd>
+                <dd>
+                  <span className={cx(s.statValue, /^\d/.test(stat.value) ? undefined : s.statWord)}>{stat.value}</span>
+                  <span className={s.statNote}>{stat.note}</span>
+                </dd>
               </div>
             ))}
           </dl>
-          <p className={s.statNote}>Counted from the code in the repository.</p>
+          <p className={s.statsFoot}>Counted from the code in the repository.</p>
         </section>
 
         <section id={SECTION.how} className={s.section} aria-labelledby="how-title">
@@ -214,7 +231,7 @@ export default function Home() {
             {STEPS.map((step, i) => (
               <li key={step.title} className={s.card}>
                 <div className={s.cardTop}>
-                  <span className={s.cardLabel}>Step {pad(i + 1)}</span>
+                  <span className={s.stepChip}>STEP // {pad(i + 1)}</span>
                   <span className={s.iconBubble}>
                     <Icon name={step.icon} className={s.icon} />
                   </span>
@@ -238,10 +255,9 @@ export default function Home() {
             <p className={s.intro}>Add the connector to Claude Code, then ask for a quote. Any MCP client that supports Streamable HTTP can use the same URL.</p>
           </div>
           <div className={s.tryWindow}>
-            <div className={s.termBar}>
-              <span className={s.termTitle}>
-                <span className={s.termTag}>Claude Code</span>
-                <span className={s.termHint}>add the MCP connector</span>
+            <div className={s.tryBar}>
+              <span>
+                <span className={s.termTag}>CLAUDE CODE</span> / add the MCP connector
               </span>
               <CopyButton text={MCP_ADD_COMMAND} label="Copy the command" />
             </div>
@@ -250,10 +266,12 @@ export default function Home() {
               <code>{MCP_ADD_COMMAND}</code>
             </pre>
             <div className={s.tryPrompt}>
-              <p className={s.promptLabel}>Then ask your agent</p>
-              <p className={s.promptText}>{SAMPLE_PROMPT}</p>
+              <div className={s.tryPromptMain}>
+                <span className={s.promptLabel}>Sample agent prompt:</span>
+                <p className={s.promptText}>{SAMPLE_PROMPT}</p>
+              </div>
               <p className={s.tryNote}>
-                It calls <code>search_products</code>, then <code>get_quote</code>. Ask it to check out and you get a link to Dodo&apos;s test checkout; nothing is charged.
+                It calls <code>search_products</code>, then <code>get_quote</code>
               </p>
             </div>
           </div>
@@ -299,16 +317,16 @@ export default function Home() {
             </h2>
             <p className={s.intro}>Buyers pay on Dodo&apos;s hosted checkout every time, so no card details pass through OpenMoR. The threat model lists where each control lives.</p>
           </div>
-          <ul className={cx(s.grid, s.grid2)}>
+          <ul className={s.securityGrid}>
             {SECURITY_CONTROLS.map((control) => (
-              <li key={control.title} className={cx(s.card, s.securityCard)}>
-                <span className={s.iconBubble}>
-                  <Icon name={control.icon} className={s.icon} />
-                </span>
-                <div>
+              <li key={control.title} className={s.securityCard}>
+                <div className={s.securityHead}>
+                  <span className={s.iconBubble}>
+                    <Icon name={control.icon} className={s.icon} />
+                  </span>
                   <h3>{control.title}</h3>
-                  <p>{control.body}</p>
                 </div>
+                <p>{control.body}</p>
               </li>
             ))}
           </ul>
@@ -320,6 +338,7 @@ export default function Home() {
               Threat model
               <Icon name="arrow" className={s.icon} />
             </a>
+            <span aria-hidden="true">/</span>
             <a href={DOCS.security}>
               SECURITY.md
               <Icon name="arrow" className={s.icon} />
@@ -338,7 +357,7 @@ export default function Home() {
           <ol className={s.grid}>
             {ROADMAP.map((item, i) => (
               <li key={item.title} className={s.card}>
-                <span className={s.cardLabel}>Roadmap {pad(i + 1)}</span>
+                <span className={s.cardLabel}>Roadmap // {pad(i + 1)}</span>
                 <h3 className={s.roadmapTitle}>{item.title}</h3>
                 <p>{item.body}</p>
                 <div className={cx(s.cardFoot, s.cardFootRule)}>
