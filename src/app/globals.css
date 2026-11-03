@@ -43,7 +43,57 @@
   --code-muted: #9fb0c0;
   --code-accent: #7ee0d2;
   --code-string: #a7f3d0;
+  /* Landing page type and scale (Hallmark Garden system in the OpenMoR palette). The faces are
+     self-hosted by next/font in layout.tsx; the fallbacks are system faces. */
+  --font-display: var(--font-vollkorn), ui-serif, Georgia, "Times New Roman", serif;
+  --font-body: var(--font-hanken), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  --font-code: ui-monospace, SFMono-Regular, "Cascadia Code", "Cascadia Mono", Consolas, Menlo, monospace;
+  --text-xs: 0.8125rem;
+  --text-sm: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: 1.125rem;
+  --text-title: clamp(1.25rem, 0.75vw + 0.875rem, 1.625rem);
+  --text-lead: clamp(1.125rem, 0.35vw + 1rem, 1.3125rem);
+  --text-section: clamp(2.25rem, 2.5vw + 1rem, 3.5rem);
+  --text-display-s: clamp(2.5rem, 4vw + 0.5rem, 4rem);
+  --text-display: clamp(3rem, 5vw + 1rem, 5.25rem);
+  --text-figure: clamp(4rem, 6.5vw + 1rem, 7.75rem);
+  --space-2xs: 4px;
+  --space-xs: 8px;
+  --space-sm: 12px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 40px;
+  --space-2xl: 64px;
+  --space-3xl: 96px;
+  --container: 1440px;
+  --gutter: 64px;
+  --gap-columns: 32px;
+  --section-gap-s: 120px;
+  --section-gap: 144px;
+  --radius-card: 4px;
+  --radius-pill: 999px;
+  --rule-hair: 1px;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-short: 220ms;
   color-scheme: light dark;
+}
+
+@media (max-width: 60rem) {
+  :root {
+    --gutter: 24px;
+    --section-gap-s: 80px;
+    --section-gap: 96px;
+  }
+}
+
+@media (max-width: 40rem) {
+  :root {
+    --gutter: 16px;
+    --gap-columns: 16px;
+    --section-gap-s: 56px;
+    --section-gap: 72px;
+  }
 }
 
 @media (prefers-color-scheme: dark) {
@@ -64,6 +114,7 @@
 
 html,
 body {
+  overflow-x: clip;
   margin: 0;
   background: var(--background);
   color: var(--foreground);
