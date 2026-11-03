@@ -96,6 +96,8 @@ export interface Step {
   icon: IconName;
   body: string;
   tool: string;
+  /** What the call hands the agent for the next step, in the step's own words. */
+  returns: string;
 }
 
 export const STEPS: Step[] = [
@@ -104,24 +106,28 @@ export const STEPS: Step[] = [
     icon: "search",
     body: "The agent searches the catalog across every listed merchant and gets each product's merchant_id and product_id.",
     tool: "search_products",
+    returns: "merchant_id and product_id",
   },
   {
     title: "Quote with the right tax",
     icon: "percent",
     body: "A quote for the buyer's country, with tax, from Dodo's checkout preview. It is the price the agent should present, and it is valid for 15 minutes.",
     tool: "get_quote",
+    returns: "a quote_id",
   },
   {
     title: "Pay on the hosted page",
     icon: "bag",
     body: "The agent sends the quote id and the buyer's email, never an amount, and gets a checkout link. The buyer sees the final price and pays on Dodo's page.",
     tool: "checkout",
+    returns: "a checkout link",
   },
   {
     title: "Receive the licence key",
     icon: "key",
     body: "After a signed webhook confirms payment, the agent gets the licence key, read live from Dodo. It is returned only with the buyer's checkout email.",
     tool: "get_order",
+    returns: "the licence key",
   },
 ];
 
