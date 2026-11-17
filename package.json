@@ -35,7 +35,7 @@
     "@vercel/analytics": "^2.0.1",
     "dodopayments": "^2.56.0",
     "mcp-handler": "^2.3.0",
-    "next": "16.4.2",
+    "next": "16.4.5",
     "pg": "^8.23.1",
     "react": "19.3.0",
     "react-dom": "19.3.0",
