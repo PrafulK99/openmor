@@ -32,6 +32,7 @@
     "@modelcontextprotocol/server": "^2.3.1",
     "@prisma/adapter-pg": "^7.10.1",
     "@prisma/client": "^7.10.1",
+    "@vercel/analytics": "^2.0.1",
     "dodopayments": "^2.56.0",
     "mcp-handler": "^2.3.0",
     "next": "16.4.2",
